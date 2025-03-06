@@ -1,0 +1,10 @@
+run = "python MedBotAI/flashcard.py"
+language = "python3"
+entrypoint = "MedBotAI/flashcard.py"
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+run = ["sh", "-c", "python MedBotAI/flashcard.py"]
+deploymentTarget = "cloudrun" 

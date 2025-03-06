@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedBot AI - Flashcards</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --background: #121212;
+      --foreground: #ffffff;
+      --card: #1e1e1e;
+      --card-foreground: #ffffff;
+      --popover: #1e1e1e;
+      --popover-foreground: #ffffff;
+      --primary: #0ea5e9;
+      --primary-foreground: #ffffff;
+      --secondary: #1e293b;
+      --secondary-foreground: #ffffff;
+      --muted: #334155;
+      --muted-foreground: #94a3b8;
+      --accent: #1e293b;
+      --accent-foreground: #ffffff;
+      --destructive: #ef4444;
+      --destructive-foreground: #ffffff;
+      --border: #334155;
+      --input: #334155;
+      --ring: #0ea5e9;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+    }
+    
+    .card {
+      background-color: var(--card);
+      color: var(--card-foreground);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .btn-secondary {
+      background-color: var(--secondary);
+      color: var(--secondary-foreground);
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .input {
+      background-color: var(--background);
+      border: 1px solid var(--input);
+      color: var(--foreground);
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      width: 100%;
+    }
+    
+    .flashcard {
+      perspective: 1000px;
+      height: 300px;
+      cursor: pointer;
+    }
+    
+    .flashcard-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      text-align: center;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+    
+    .flashcard.flipped .flashcard-inner {
+      transform: rotateY(180deg);
+    }
+    
+    .flashcard-front, .flashcard-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      -webkit-backface-visibility: hidden;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border);
+      background-color: var(--card);
+    }
+    
+    .flashcard-back {
+      transform: rotateY(180deg);
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen flex flex-col">
+    <header class="bg-[var(--card)] border-b border-[var(--border)] p-4">
+      <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <img src="/logo.png" alt="MedBot AI Logo" class="h-8 w-8" />
+          <h1 class="text-xl font-bold">MedBot AI</h1>
+        </div>
+        <nav>
+          <ul class="flex space-x-4">
+            <li><a href="/" class="hover:text-[var(--primary)]">Home</a></li>
+            <li><a href="/chat" class="hover:text-[var(--primary)]">Chat</a></li>
+            <li><a href="/flashcards" class="hover:text-[var(--primary)] text-[var(--primary)]">Flashcards</a></li>
+            <li><a href="/exams" class="hover:text-[var(--primary)]">Practice Exams</a></li>
+            <li><a href="/calendar" class="hover:text-[var(--primary)]">Study Planner</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+    
+    <main class="flex-1 container mx-auto p-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card md:col-span-1">
+          <h2 class="text-2xl font-bold mb-4">Generate Flashcards</h2>
+          <form id="flashcard-form" class="space-y-4">
+            <div>
+              <label for="topic" class="block mb-2">Medical Topic</label>
+              <input type="text" id="topic" class="input" placeholder="e.g., Cardiovascular System" required />
+            </div>
+            
+            <div>
+              <label for="count" class="block mb-2">Number of Flashcards</label>
+              <select id="count" class="input">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+            
+            <div>
+              <label for="difficulty" class="block mb-2">Difficulty Level</label>
+              <select id="difficulty" class="input">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate" selected>Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+            
+            <button type="submit" class="btn-primary w-full">
+              <i class="fas fa-plus mr-2"></i>Generate Flashcards
+            </button>
+          </form>
+        </div>
+        
+        <div class="card md:col-span-2">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl font-bold">Your Flashcards</h2>
+            <div class="flex space-x-2">
+              <button id="prev-card" class="btn-secondary" disabled>
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              <span id="card-counter" class="py-2 px-4 bg-[var(--secondary)] rounded-md">0/0</span>
+              <button id="next-card" class="btn-secondary" disabled>
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div id="flashcards-container" class="h-[400px] flex items-center justify-center">
+            <p class="text-center text-[var(--muted-foreground)]">
+              No flashcards yet. Generate some using the form on the left.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+    
+    <footer class="bg-[var(--card)] border-t border-[var(--border)] p-4 text-center">
+      <p>© 2023 MedBot AI. All rights reserved.</p>
+    </footer>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const flashcardForm = document.getElementById('flashcard-form');
+      const flashcardsContainer = document.getElementById('flashcards-container');
+      const prevCardButton = document.getElementById('prev-card');
+      const nextCardButton = document.getElementById('next-card');
+      const cardCounter = document.getElementById('card-counter');
+      
+      let flashcards = [];
+      let currentCardIndex = 0;
+      
+      // Handle navigation
+      const links = document.querySelectorAll('a');
+      links.forEach(link => {
+        link.addEventListener('click', function(e) {
+          if (link.getAttribute('href').startsWith('/')) {
+            e.preventDefault();
+            const path = link.getAttribute('href');
+            window.location.href = path === '/' ? '/index.html' : path + '.html';
+          }
+        });
+      });
+      
+      // Handle flashcard form submission
+      flashcardForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const topic = document.getElementById('topic').value.trim();
+        const count = document.getElementById('count').value;
+        const difficulty = document.getElementById('difficulty').value;
+        
+        if (!topic) return;
+        
+        // Show loading indicator
+        flashcardsContainer.innerHTML = '<div class="loading"></div>';
+        prevCardButton.disabled = true;
+        nextCardButton.disabled = true;
+        
+        // Simulate API call
+        setTimeout(() => {
+          // Simulate API response
+          fetch('/api/flashcards', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ topic, count, difficulty }),
+          })
+          .then(response => response.json())
+          .then(data => {
+            flashcards = data.flashcards || generateDummyFlashcards(topic, count, difficulty);
+            currentCardIndex = 0;
+            updateCardDisplay();
+          })
+          .catch(error => {
+            // Fallback to dummy data if API call fails
+            console.error('Error:', error);
+            flashcards = generateDummyFlashcards(topic, count, difficulty);
+            currentCardIndex = 0;
+            updateCardDisplay();
+          });
+        }, 1500);
+      });
+      
+      // Handle flashcard navigation
+      prevCardButton.addEventListener('click', function() {
+        if (currentCardIndex > 0) {
+          currentCardIndex--;
+          updateCardDisplay();
+        }
+      });
+      
+      nextCardButton.addEventListener('click', function() {
+        if (currentCardIndex < flashcards.length - 1) {
+          currentCardIndex++;
+          updateCardDisplay();
+        }
+      });
+      
+      // Function to update the flashcard display
+      function updateCardDisplay() {
+        if (flashcards.length === 0) {
+          flashcardsContainer.innerHTML = '<p class="text-center text-[var(--muted-foreground)]">No flashcards yet. Generate some using the form on the left.</p>';
+          cardCounter.textContent = '0/0';
+          prevCardButton.disabled = true;
+          nextCardButton.disabled = true;
+          return;
+        }
+        
+        const card = flashcards[currentCardIndex];
+        
+        flashcardsContainer.innerHTML = `
+          <div class="flashcard w-full" id="current-flashcard">
+            <div class="flashcard-inner">
+              <div class="flashcard-front">
+                <h3 class="text-xl font-bold">${card.question}</h3>
+              </div>
+              <div class="flashcard-back">
+                <p>${card.answer}</p>
+              </div>
+            </div>
+          </div>
+          <p class="text-center mt-4 text-[var(--muted-foreground)]">Click the card to flip it</p>
+        `;
+        
+        // Add click event to flip the card
+        document.getElementById('current-flashcard').addEventListener('click', function() {
+          this.classList.toggle('flipped');
+        });
+        
+        // Update counter and buttons
+        cardCounter.textContent = `${currentCardIndex + 1}/${flashcards.length}`;
+        prevCardButton.disabled = currentCardIndex === 0;
+        nextCardButton.disabled = currentCardIndex === flashcards.length - 1;
+      }
+      
+      // Function to generate dummy flashcards for testing
+      function generateDummyFlashcards(topic, count, difficulty) {
+        const dummyData = [];
+        const difficultyFactor = difficulty === 'beginner' ? 'basic' : 
+                               difficulty === 'intermediate' ? 'intermediate' : 'advanced';
+        
+        for (let i = 0; i < count; i++) {
+          dummyData.push({
+            id: i + 1,
+            question: `${difficultyFactor.charAt(0).toUpperCase() + difficultyFactor.slice(1)} question about ${topic} (#${i + 1})`,
+            answer: `This is a ${difficultyFactor} answer about ${topic}. It would contain detailed information relevant to the question.`
+          });
+        }
+        
+        return dummyData;
+      }
+    });
+  </script>
+</body>
+</html> 

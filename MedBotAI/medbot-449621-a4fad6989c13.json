@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "medbot-449621",
+  "private_key_id": "a4fad6989c13b06ff431b19400fafc2679eba0a4",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDAALyzHP7LT91d\nU+wjMs06NqC12+t/cI3X87K3/aCWchJE2djiWEuNlMdM66sYPpBBKxSZ8NuqcbeV\nwQ7hXJLFJu9iPyWv38BmmfbcKUo8N7h6F9KY3H8MK51qyTEyZU3HapFFt4NkuVdA\n9GEv9F0+K+MqehOFm2XSUwwj4PQFPRCDiL/6H8rTu7Xx8Qwgp7omfKLQieBsm3e4\ndOHvVmzV40VVjwhn7KOXs1ia2p0F+HxKRgqGXAZi0iRXrO5qnuiALyeYa73roj4i\nJt4cVppdFUE3O6H/OIyGkJWrzmRB6aR0Z5DffklI6vL386CMGi4RWxmR9JPGYr8c\nbm/fy29nAgMBAAECggEADczfw0X9wFJEuG0MR3liy+DaS0f71MSbxV5URao6rSWU\nz5MS5i3vfEUp0AsOWKdCihSVHf10ZHtY9TATqDoVqIsEYLzmMg50j0tYtXlYRxzA\nKzJkJi2PCipmXaMJYLRsUz2DJI4sqQQzU81c4OwA+bOA1/A/T/ab6nKiqD+GeovJ\nqIGOExwWuZaC/FP6lHEPZmyggBljhhkcBtplw22GvYRUGveJ+XzD1MNmtROPLHis\nsoev2JABQgZu5kU3iq8wSuhxaaPeprKbsvZV1CRipKYwsuddeiPyp2LXXiLNEhi9\nsT4BaZjh82IfDZvACKtTDRgjiZeM0lnA3AWifxMTVQKBgQDoeUcoMuMcPC8oTgBK\nHP9tlHRIU0K64VP4zePGGOVAxhRZb4BMprxiIx/tNkvqj9pY0Lt6y1TiXlJkSniL\nbfwbe2riaMEHkognBO5V2H/AoAP+7xnCM6YabNn0zLe0fpwVJ8+z7Uu7S12ltR9e\np3HsuhU5JjrZRfl40zmGBSfA1QKBgQDTbvnnvY3wc1de/hOLdF1kDI5EjFaFI/x2\noWSllrtmiVLeWawY7jqXZzGmxIvbhMW8CrwT+Dr4UjtHCaN7Qg0hoZI6CmWYPIBg\nV6s3EoIN4d6B47I5tiLpDBKYqpSfro2ClT50UrpyJoaDDUEGR36PMmpj9FIz6t9N\n2jQ0u36tSwKBgQCAnzlDgIQvhw0AW8fFOa4JTu3XZlmxVCJFsoSngfa1k+KGaS6v\nOkFYet6bPENckCLaqQJRulZIuK8VVi7D1iJ6ghptElBahDRYgl3rmVF1nhMX5ep2\njGUGkds1ml65uqNZASHmBxCzm8tAd6nXkQVzWLGNYR2GQTT6KMPW5ttL0QKBgCxa\nd2o5xXDPgWCYBBmZC45VY/LVTcEYT3nDWY2zFRTpcczbGtMQBpKEP1IwoPYn4CMW\nTWYTCKvW9EBusTDGJmMLtdUfITjSWEvdmDkxVL78xuSQk26v2prwwWXtQshMobrm\n+/cC88HGeyk6uo1Kqi338YGOW0Aw4S8/uvvk6SoJAoGAMUp6TmHZDdsqyZ/rY43m\nB03kY0cde8KFUcRNrz2+6OQhbKuK5acrAmWyTefQszV42RJMqXmZ9PbqJodICSPt\nuPi/MWgwcYm+0RuavmIV1XZTwdIFPQuI6N/zf1CbXQ3xn9g+mJu3G7IArM5hORNu\n63X/O9RZz5UhC0r5D7tjPqI=\n-----END PRIVATE KEY-----\n",
+  "client_email": "medbot-calendar-access@medbot-449621.iam.gserviceaccount.com",
+  "client_id": "110020526204731686151",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/medbot-calendar-access%40medbot-449621.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

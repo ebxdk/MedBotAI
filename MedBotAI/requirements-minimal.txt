@@ -1,0 +1,17 @@
+flask==2.3.3
+flask-socketio==5.5.1
+flask-cors==4.0.0
+python-dotenv==1.0.0
+requests==2.31.0
+openai>=1.10.0
+nltk==3.8.1
+pandas==2.0.3
+numpy==1.24.3
+langchain==0.1.5
+langchain-openai==0.0.5
+sentence-transformers==3.1.1
+faiss-cpu==1.7.4
+PyMuPDF==1.23.8
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.108.0 

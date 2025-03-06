@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedBot AI - Practice Exams</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --background: 220 10% 4%;
+            --foreground: 213 31% 91%;
+            --card: 224 71% 4%;
+            --card-foreground: 213 31% 91%;
+            --popover: 224 71% 4%;
+            --popover-foreground: 215 20.2% 65.1%;
+            --primary: 210 40% 50%;
+            --primary-foreground: 222.2 47.4% 11.2%;
+            --secondary: 222.2 47.4% 11.2%;
+            --secondary-foreground: 210 40% 98%;
+            --muted: 223 47% 11%;
+            --muted-foreground: 215 20.2% 65.1%;
+            --accent: 216 34% 17%;
+            --accent-foreground: 210 40% 98%;
+            --destructive: 0 63% 31%;
+            --destructive-foreground: 210 40% 98%;
+            --border: 216 34% 17%;
+            --input: 216 34% 17%;
+            --ring: 224 76% 48%;
+            --radius: 0.5rem;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --background: 0 0% 100%;
+                --foreground: 240 10% 3.9%;
+                --card: 0 0% 100%;
+                --card-foreground: 240 10% 3.9%;
+                --popover: 0 0% 100%;
+                --popover-foreground: 240 10% 3.9%;
+                --primary: 221.2 83.2% 53.3%;
+                --primary-foreground: 210 40% 98%;
+                --secondary: 240 4.8% 95.9%;
+                --secondary-foreground: 240 5.9% 10%;
+                --muted: 240 4.8% 95.9%;
+                --muted-foreground: 240 3.8% 46.1%;
+                --accent: 240 4.8% 95.9%;
+                --accent-foreground: 240 5.9% 10%;
+                --destructive: 0 84.2% 60.2%;
+                --destructive-foreground: 0 0% 98%;
+                --border: 240 5.9% 90%;
+                --input: 240 5.9% 90%;
+                --ring: 240 5.9% 10%;
+            }
+        }
+
+        * {
+            border-color: hsl(var(--border));
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .card {
+            border-radius: var(--radius);
+            background-color: hsl(var(--card));
+            color: hsl(var(--card-foreground));
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            font-weight: 500;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            height: 2.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            transition-property: color, background-color, border-color;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+
+        .btn-primary {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .btn-primary:hover {
+            background-color: hsl(var(--primary) / 0.9);
+        }
+
+        .btn-secondary {
+            background-color: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+        }
+
+        .btn-secondary:hover {
+            background-color: hsl(var(--secondary) / 0.8);
+        }
+
+        .input {
+            display: flex;
+            height: 2.5rem;
+            width: 100%;
+            border-radius: var(--radius);
+            border: 1px solid hsl(var(--input));
+            background-color: transparent;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            font-size: 0.875rem;
+            transition-property: border-color, box-shadow;
+            transition-duration: 150ms;
+        }
+
+        .input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px hsl(var(--ring));
+            border-color: hsl(var(--ring));
+        }
+
+        .navbar {
+            background-color: hsl(var(--card));
+            border-bottom: 1px solid hsl(var(--border));
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            color: hsl(var(--foreground));
+        }
+
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-radius: var(--radius);
+            background-color: hsl(var(--card));
+            padding: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .nav-tab {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: var(--radius);
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab:hover {
+            background-color: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+        }
+
+        .nav-tab.active {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .question-card {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            background-color: hsl(var(--card));
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: var(--radius);
+            background-color: hsl(var(--secondary));
+            color: hsl(var(--secondary-foreground));
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .option-label:hover {
+            background-color: hsl(var(--secondary) / 0.8);
+        }
+
+        .option-label.selected {
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+        }
+
+        .option-label.correct {
+            background-color: hsl(142.1 76.2% 36.3%);
+            color: hsl(0 0% 98%);
+        }
+
+        .option-label.incorrect {
+            background-color: hsl(0 84.2% 60.2%);
+            color: hsl(0 0% 98%);
+        }
+
+        .explanation-box {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: var(--radius);
+            background-color: hsl(var(--accent));
+            color: hsl(var(--accent-foreground));
+        }
+
+        .loading-spinner {
+            border: 4px solid hsl(var(--secondary));
+            border-top: 4px solid hsl(var(--primary));
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="gradient-bg">
+    <nav class="navbar p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <a class="navbar-brand flex items-center gap-2" href="/">
+                <i class="fas fa-robot text-primary"></i>
+                <span class="text-xl">MedBot AI</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4">
+        <div class="nav-tabs mx-auto max-w-2xl mb-8">
+            <a href="/" class="nav-tab">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <a href="/chat" class="nav-tab">
+                <i class="fas fa-comments"></i>
+                <span>Chat</span>
+            </a>
+            <a href="/flashcard" class="nav-tab">
+                <i class="fas fa-clone"></i>
+                <span>Flashcards</span>
+            </a>
+            <a href="/exam" class="nav-tab active">
+                <i class="fas fa-file-alt"></i>
+                <span>Practice Exams</span>
+            </a>
+            <a href="/calendar" class="nav-tab">
+                <i class="fas fa-calendar-alt"></i>
+                <span>Study Planner</span>
+            </a>
+        </div>
+
+        <div class="card p-6 mb-8">
+            <h1 class="text-2xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-file-alt text-primary"></i>
+                AI Practice Exam Generator
+            </h1>
+            
+            <form id="examForm" class="space-y-4">
+                <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium" for="university">
+                            University/Institution
+                        </label>
+                        <input type="text" id="university" name="university" 
+                               class="input"
+                               placeholder="Enter University or Institution Name" value="Medical School">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium" for="course">
+                            Course
+                        </label>
+                        <input type="text" id="course" name="course"
+                               class="input"
+                               placeholder="Enter Course Name" value="Internal Medicine">
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium" for="topic">
+                        Topic
+                    </label>
+                    <input type="text" id="topic" name="topic"
+                           class="input"
+                           placeholder="Enter specific topic (e.g., Cardiology, Neurology)" required>
+                </div>
+                <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium" for="num_questions">
+                            Number of Questions
+                        </label>
+                        <select id="num_questions" name="num_questions" class="input">
+                            <option value="5">5 Questions</option>
+                            <option value="10" selected>10 Questions</option>
+                            <option value="15">15 Questions</option>
+                            <option value="20">20 Questions</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium" for="difficulty">
+                            Difficulty Level
+                        </label>
+                        <select id="difficulty" name="difficulty" class="input">
+                            <option value="easy">Easy</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="hard">Hard</option>
+                            <option value="mixed">Mixed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" id="generateBtn"
+                            class="btn btn-primary w-full">
+                        <i class="fas fa-magic mr-2"></i>
+                        Generate Practice Exam
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="text-center hidden py-12">
+            <div class="loading-spinner mx-auto"></div>
+            <p class="mt-4 text-muted-foreground">Generating your practice exam...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error" class="bg-destructive/15 text-destructive px-4 py-3 rounded-md hidden mb-6" role="alert">
+            <span id="errorMessage" class="block sm:inline"></span>
+        </div>
+
+        <!-- Exam Container -->
+        <div id="examContainer" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Practice Exam</h2>
+                <div class="flex gap-2">
+                    <button id="showAllExplanationsBtn" class="btn btn-secondary">
+                        <i class="fas fa-lightbulb mr-2"></i>
+                        Show All Explanations
+                    </button>
+                    <button id="submitExamBtn" class="btn btn-primary">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Submit Exam
+                    </button>
+                </div>
+            </div>
+            
+            <div id="questionsContainer" class="space-y-6">
+                <!-- Questions will be dynamically inserted here -->
+            </div>
+            
+            <div id="resultsContainer" class="card p-6 mt-8 hidden">
+                <h3 class="text-xl font-bold mb-4">Exam Results</h3>
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-lg">Score: <span id="scoreDisplay" class="font-bold">0/0</span></p>
+                        <p class="text-muted-foreground">Percentage: <span id="percentageDisplay">0%</span></p>
+                    </div>
+                    <div>
+                        <button id="retakeBtn" class="btn btn-secondary">
+                            <i class="fas fa-redo mr-2"></i>
+                            Retake Exam
+                        </button>
+                        <button id="newExamBtn" class="btn btn-primary ml-2">
+                            <i class="fas fa-plus mr-2"></i>
+                            New Exam
+                        </button>
+                    </div>
+                </div>
+                <div id="feedbackContainer" class="mt-4 p-4 rounded-md bg-accent/20">
+                    <h4 class="font-bold mb-2">Feedback</h4>
+                    <p id="feedbackText">Complete the exam to receive feedback.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const examForm = document.getElementById('examForm');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const errorMessage = document.getElementById('errorMessage');
+            const examContainer = document.getElementById('examContainer');
+            const questionsContainer = document.getElementById('questionsContainer');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const percentageDisplay = document.getElementById('percentageDisplay');
+            const feedbackText = document.getElementById('feedbackText');
+            const showAllExplanationsBtn = document.getElementById('showAllExplanationsBtn');
+            const submitExamBtn = document.getElementById('submitExamBtn');
+            const retakeBtn = document.getElementById('retakeBtn');
+            const newExamBtn = document.getElementById('newExamBtn');
+            
+            let examQuestions = [];
+            let userAnswers = {};
+            let explanationsVisible = false;
+            
+            // Handle form submission
+            examForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                generateExam();
+            });
+            
+            // Show all explanations
+            showAllExplanationsBtn.addEventListener('click', function() {
+                toggleAllExplanations();
+            });
+            
+            // Submit exam
+            submitExamBtn.addEventListener('click', function() {
+                submitExam();
+            });
+            
+            // Retake exam
+            retakeBtn.addEventListener('click', function() {
+                retakeExam();
+            });
+            
+            // New exam
+            newExamBtn.addEventListener('click', function() {
+                resetExam();
+            });
+            
+            // Generate exam
+            function generateExam() {
+                const university = document.getElementById('university').value;
+                const course = document.getElementById('course').value;
+                const topic = document.getElementById('topic').value;
+                const numQuestions = document.getElementById('num_questions').value;
+                const difficulty = document.getElementById('difficulty').value;
+                
+                if (!topic) {
+                    showError('Please enter a topic');
+                    return;
+                }
+                
+                // Show loading indicator
+                loading.classList.remove('hidden');
+                error.classList.add('hidden');
+                examContainer.classList.add('hidden');
+                resultsContainer.classList.add('hidden');
+                
+                // Reset exam state
+                examQuestions = [];
+                userAnswers = {};
+                explanationsVisible = false;
+                
+                // Make API request
+                fetch('/exam/generate-exam', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        university: university,
+                        course: course,
+                        topic: topic,
+                        num_questions: numQuestions,
+                        difficulty: difficulty
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Hide loading indicator
+                    loading.classList.add('hidden');
+                    
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    
+                    // Store exam questions
+                    examQuestions = data.questions;
+                    
+                    // Render questions
+                    renderQuestions();
+                    
+                    // Show exam container
+                    examContainer.classList.remove('hidden');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loading.classList.add('hidden');
+                    showError('Error generating exam. Please try again.');
+                });
+            }
+            
+            // Render questions
+            function renderQuestions() {
+                questionsContainer.innerHTML = '';
+                
+                examQuestions.forEach((question, index) => {
+                    const questionCard = document.createElement('div');
+                    questionCard.className = 'question-card';
+                    
+                    const questionNumber = index + 1;
+                    const questionId = `question-${questionNumber}`;
+                    
+                    let optionsHtml = '';
+                    question.options.forEach((option, optionIndex) => {
+                        const optionId = `${questionId}-option-${optionIndex}`;
+                        const isSelected = userAnswers[questionNumber] === optionIndex;
+                        const optionClass = isSelected ? 'option-label selected' : 'option-label';
+                        
+                        optionsHtml += `
+                            <label class="${optionClass}" data-question="${questionNumber}" data-option="${optionIndex}">
+                                <input type="radio" name="${questionId}" value="${optionIndex}" class="mr-2" ${isSelected ? 'checked' : ''}>
+                                <span>${option}</span>
+                            </label>
+                        `;
+                    });
+                    
+                    const explanationClass = explanationsVisible ? '' : 'hidden';
+                    
+                    questionCard.innerHTML = `
+                        <h3 class="text-lg font-bold mb-4">Question ${questionNumber}: ${question.question}</h3>
+                        <div class="options-container mb-4">
+                            ${optionsHtml}
+                        </div>
+                        <div class="explanation-box ${explanationClass}" id="${questionId}-explanation">
+                            <h4 class="font-bold mb-2">Explanation:</h4>
+                            <p>${question.explanation}</p>
+                        </div>
+                    `;
+                    
+                    questionsContainer.appendChild(questionCard);
+                });
+                
+                // Add event listeners to options
+                document.querySelectorAll('.option-label').forEach(option => {
+                    option.addEventListener('click', function() {
+                        const questionNumber = parseInt(this.dataset.question);
+                        const optionIndex = parseInt(this.dataset.option);
+                        
+                        // Update selected option
+                        document.querySelectorAll(`.option-label[data-question="${questionNumber}"]`).forEach(opt => {
+                            opt.classList.remove('selected');
+                        });
+                        this.classList.add('selected');
+                        
+                        // Update user answers
+                        userAnswers[questionNumber] = optionIndex;
+                    });
+                });
+            }
+            
+            // Toggle all explanations
+            function toggleAllExplanations() {
+                explanationsVisible = !explanationsVisible;
+                
+                if (explanationsVisible) {
+                    document.querySelectorAll('.explanation-box').forEach(box => {
+                        box.classList.remove('hidden');
+                    });
+                    showAllExplanationsBtn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i>Hide All Explanations';
+                } else {
+                    document.querySelectorAll('.explanation-box').forEach(box => {
+                        box.classList.add('hidden');
+                    });
+                    showAllExplanationsBtn.innerHTML = '<i class="fas fa-lightbulb mr-2"></i>Show All Explanations';
+                }
+            }
+            
+            // Submit exam
+            function submitExam() {
+                let score = 0;
+                
+                // Check answers
+                examQuestions.forEach((question, index) => {
+                    const questionNumber = index + 1;
+                    const userAnswer = userAnswers[questionNumber];
+                    const correctAnswer = question.correct_answer;
+                    
+                    // Mark options as correct or incorrect
+                    document.querySelectorAll(`.option-label[data-question="${questionNumber}"]`).forEach((option, optionIndex) => {
+                        if (optionIndex === correctAnswer) {
+                            option.classList.add('correct');
+                        } else if (optionIndex === userAnswer && userAnswer !== correctAnswer) {
+                            option.classList.add('incorrect');
+                        }
+                        
+                        // Disable options
+                        option.style.pointerEvents = 'none';
+                    });
+                    
+                    // Show explanation
+                    document.getElementById(`question-${questionNumber}-explanation`).classList.remove('hidden');
+                    
+                    // Update score
+                    if (userAnswer === correctAnswer) {
+                        score++;
+                    }
+                });
+                
+                // Update results
+                scoreDisplay.textContent = `${score}/${examQuestions.length}`;
+                const percentage = Math.round((score / examQuestions.length) * 100);
+                percentageDisplay.textContent = `${percentage}%`;
+                
+                // Generate feedback
+                let feedback = '';
+                if (percentage >= 90) {
+                    feedback = 'Excellent work! You have a strong understanding of this topic.';
+                } else if (percentage >= 70) {
+                    feedback = 'Good job! You have a solid grasp of the material, but there are a few areas to review.';
+                } else if (percentage >= 50) {
+                    feedback = 'You\'re on the right track, but you should review this topic more thoroughly.';
+                } else {
+                    feedback = 'This topic needs significant review. Consider studying the material again and retaking the exam.';
+                }
+                
+                feedbackText.textContent = feedback;
+                
+                // Show results
+                resultsContainer.classList.remove('hidden');
+                
+                // Disable submit button
+                submitExamBtn.disabled = true;
+                submitExamBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                // Show all explanations
+                explanationsVisible = true;
+                showAllExplanationsBtn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i>Hide All Explanations';
+                document.querySelectorAll('.explanation-box').forEach(box => {
+                    box.classList.remove('hidden');
+                });
+            }
+            
+            // Retake exam
+            function retakeExam() {
+                // Reset user answers
+                userAnswers = {};
+                
+                // Reset UI
+                resultsContainer.classList.add('hidden');
+                submitExamBtn.disabled = false;
+                submitExamBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                // Hide explanations
+                explanationsVisible = false;
+                showAllExplanationsBtn.innerHTML = '<i class="fas fa-lightbulb mr-2"></i>Show All Explanations';
+                
+                // Re-render questions
+                renderQuestions();
+            }
+            
+            // Reset exam
+            function resetExam() {
+                // Hide exam container
+                examContainer.classList.add('hidden');
+                
+                // Reset form
+                document.getElementById('topic').value = '';
+                document.getElementById('topic').focus();
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorMessage.textContent = message;
+                error.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html> 

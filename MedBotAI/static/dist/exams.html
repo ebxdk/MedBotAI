@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedBot AI - Practice Exams</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --background: #121212;
+      --foreground: #ffffff;
+      --card: #1e1e1e;
+      --card-foreground: #ffffff;
+      --popover: #1e1e1e;
+      --popover-foreground: #ffffff;
+      --primary: #0ea5e9;
+      --primary-foreground: #ffffff;
+      --secondary: #1e293b;
+      --secondary-foreground: #ffffff;
+      --muted: #334155;
+      --muted-foreground: #94a3b8;
+      --accent: #1e293b;
+      --accent-foreground: #ffffff;
+      --destructive: #ef4444;
+      --destructive-foreground: #ffffff;
+      --border: #334155;
+      --input: #334155;
+      --ring: #0ea5e9;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--background);
+      color: var(--foreground);
+    }
+    
+    .card {
+      background-color: var(--card);
+      color: var(--card-foreground);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: var(--primary-foreground);
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .btn-secondary {
+      background-color: var(--secondary);
+      color: var(--secondary-foreground);
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .input {
+      background-color: var(--background);
+      border: 1px solid var(--input);
+      color: var(--foreground);
+      padding: 0.5rem;
+      border-radius: 0.25rem;
+      width: 100%;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .question {
+      margin-bottom: 2rem;
+    }
+    
+    .option {
+      display: flex;
+      align-items: center;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 0.25rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .option:hover {
+      background-color: var(--secondary);
+    }
+    
+    .option.selected {
+      background-color: var(--primary);
+      border-color: var(--primary);
+    }
+    
+    .option.correct {
+      background-color: #10b981;
+      border-color: #10b981;
+    }
+    
+    .option.incorrect {
+      background-color: var(--destructive);
+      border-color: var(--destructive);
+    }
+    
+    .explanation {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: var(--secondary);
+      border-radius: 0.25rem;
+      display: none;
+    }
+    
+    .explanation.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="min-h-screen flex flex-col">
+    <header class="bg-[var(--card)] border-b border-[var(--border)] p-4">
+      <div class="container mx-auto flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <img src="/logo.png" alt="MedBot AI Logo" class="h-8 w-8" />
+          <h1 class="text-xl font-bold">MedBot AI</h1>
+        </div>
+        <nav>
+          <ul class="flex space-x-4">
+            <li><a href="/" class="hover:text-[var(--primary)]">Home</a></li>
+            <li><a href="/chat" class="hover:text-[var(--primary)]">Chat</a></li>
+            <li><a href="/flashcards" class="hover:text-[var(--primary)]">Flashcards</a></li>
+            <li><a href="/exams" class="hover:text-[var(--primary)] text-[var(--primary)]">Practice Exams</a></li>
+            <li><a href="/calendar" class="hover:text-[var(--primary)]">Study Planner</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+    
+    <main class="flex-1 container mx-auto p-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card md:col-span-1" id="exam-form-container">
+          <h2 class="text-2xl font-bold mb-4">Generate Practice Exam</h2>
+          <form id="exam-form" class="space-y-4">
+            <div>
+              <label for="university" class="block mb-2">University/Institution</label>
+              <input type="text" id="university" class="input" placeholder="e.g., Harvard Medical School" />
+            </div>
+            
+            <div>
+              <label for="course" class="block mb-2">Course</label>
+              <input type="text" id="course" class="input" placeholder="e.g., Anatomy" />
+            </div>
+            
+            <div>
+              <label for="topic" class="block mb-2">Topic</label>
+              <input type="text" id="topic" class="input" placeholder="e.g., Cardiovascular System" required />
+            </div>
+            
+            <div>
+              <label for="count" class="block mb-2">Number of Questions</label>
+              <select id="count" class="input">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+              </select>
+            </div>
+            
+            <div>
+              <label for="difficulty" class="block mb-2">Difficulty Level</label>
+              <select id="difficulty" class="input">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate" selected>Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+            
+            <button type="submit" class="btn-primary w-full">
+              <i class="fas fa-file-medical mr-2"></i>Generate Exam
+            </button>
+          </form>
+        </div>
+        
+        <div class="card md:col-span-2" id="exam-container">
+          <div id="exam-placeholder" class="text-center py-8">
+            <i class="fas fa-file-medical text-6xl text-[var(--muted-foreground)] mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">No Exam Generated Yet</h2>
+            <p class="text-[var(--muted-foreground)]">
+              Use the form on the left to generate a practice exam tailored to your needs.
+            </p>
+          </div>
+          
+          <div id="exam-content" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-2xl font-bold" id="exam-title">Practice Exam</h2>
+              <div id="exam-progress" class="py-2 px-4 bg-[var(--secondary)] rounded-md">
+                Question <span id="current-question">1</span>/<span id="total-questions">10</span>
+              </div>
+            </div>
+            
+            <div id="questions-container">
+              <!-- Questions will be added here -->
+            </div>
+            
+            <div id="exam-controls" class="flex justify-between mt-6">
+              <button id="prev-question" class="btn-secondary" disabled>
+                <i class="fas fa-chevron-left mr-2"></i>Previous
+              </button>
+              <button id="next-question" class="btn-primary">
+                Next<i class="fas fa-chevron-right ml-2"></i>
+              </button>
+            </div>
+            
+            <div id="submit-container" class="mt-6 text-center hidden">
+              <button id="submit-exam" class="btn-primary px-8">
+                <i class="fas fa-check-circle mr-2"></i>Submit Exam
+              </button>
+            </div>
+            
+            <div id="results-container" class="mt-6 hidden">
+              <h3 class="text-xl font-bold mb-4">Exam Results</h3>
+              <div class="bg-[var(--secondary)] p-4 rounded-md mb-4">
+                <div class="flex justify-between items-center">
+                  <span>Score:</span>
+                  <span id="exam-score" class="text-xl font-bold">0/0</span>
+                </div>
+                <div class="w-full bg-[var(--muted)] h-2 rounded-full mt-2">
+                  <div id="score-bar" class="bg-[var(--primary)] h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+              
+              <button id="show-answers" class="btn-secondary w-full">
+                <i class="fas fa-eye mr-2"></i>Show Answers and Explanations
+              </button>
+              
+              <button id="restart-exam" class="btn-primary w-full mt-4">
+                <i class="fas fa-redo mr-2"></i>Generate New Exam
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    
+    <footer class="bg-[var(--card)] border-t border-[var(--border)] p-4 text-center">
+      <p>© 2023 MedBot AI. All rights reserved.</p>
+    </footer>
+  </div>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const examForm = document.getElementById('exam-form');
+      const examPlaceholder = document.getElementById('exam-placeholder');
+      const examContent = document.getElementById('exam-content');
+      const questionsContainer = document.getElementById('questions-container');
+      const prevQuestionButton = document.getElementById('prev-question');
+      const nextQuestionButton = document.getElementById('next-question');
+      const submitContainer = document.getElementById('submit-container');
+      const submitExamButton = document.getElementById('submit-exam');
+      const resultsContainer = document.getElementById('results-container');
+      const examScore = document.getElementById('exam-score');
+      const scoreBar = document.getElementById('score-bar');
+      const showAnswersButton = document.getElementById('show-answers');
+      const restartExamButton = document.getElementById('restart-exam');
+      const currentQuestionSpan = document.getElementById('current-question');
+      const totalQuestionsSpan = document.getElementById('total-questions');
+      const examTitle = document.getElementById('exam-title');
+      
+      let examQuestions = [];
+      let currentQuestionIndex = 0;
+      let userAnswers = [];
+      let examSubmitted = false;
+      
+      // Handle navigation
+      const links = document.querySelectorAll('a');
+      links.forEach(link => {
+        link.addEventListener('click', function(e) {
+          if (link.getAttribute('href').startsWith('/')) {
+            e.preventDefault();
+            const path = link.getAttribute('href');
+            window.location.href = path === '/' ? '/index.html' : path + '.html';
+          }
+        });
+      });
+      
+      // Handle exam form submission
+      examForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const university = document.getElementById('university').value.trim();
+        const course = document.getElementById('course').value.trim();
+        const topic = document.getElementById('topic').value.trim();
+        const count = document.getElementById('count').value;
+        const difficulty = document.getElementById('difficulty').value;
+        
+        if (!topic) return;
+        
+        // Show loading indicator
+        examPlaceholder.innerHTML = '<div class="flex justify-center items-center py-8"><div class="loading"></div></div>';
+        examPlaceholder.classList.remove('hidden');
+        examContent.classList.add('hidden');
+        
+        // Reset exam state
+        examQuestions = [];
+        currentQuestionIndex = 0;
+        userAnswers = [];
+        examSubmitted = false;
+        
+        // Simulate API call
+        setTimeout(() => {
+          // Simulate API response
+          fetch('/api/exams', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ university, course, topic, count, difficulty }),
+          })
+          .then(response => response.json())
+          .then(data => {
+            examQuestions = data.questions || generateDummyExam(topic, count, difficulty);
+            userAnswers = new Array(examQuestions.length).fill(null);
+            
+            // Update UI
+            examTitle.textContent = `${topic} Practice Exam`;
+            totalQuestionsSpan.textContent = examQuestions.length;
+            
+            // Show exam content
+            examPlaceholder.classList.add('hidden');
+            examContent.classList.remove('hidden');
+            
+            // Display first question
+            displayQuestion(0);
+          })
+          .catch(error => {
+            // Fallback to dummy data if API call fails
+            console.error('Error:', error);
+            examQuestions = generateDummyExam(topic, count, difficulty);
+            userAnswers = new Array(examQuestions.length).fill(null);
+            
+            // Update UI
+            examTitle.textContent = `${topic} Practice Exam`;
+            totalQuestionsSpan.textContent = examQuestions.length;
+            
+            // Show exam content
+            examPlaceholder.classList.add('hidden');
+            examContent.classList.remove('hidden');
+            
+            // Display first question
+            displayQuestion(0);
+          });
+        }, 1500);
+      });
+      
+      // Handle question navigation
+      prevQuestionButton.addEventListener('click', function() {
+        if (currentQuestionIndex > 0) {
+          currentQuestionIndex--;
+          displayQuestion(currentQuestionIndex);
+        }
+      });
+      
+      nextQuestionButton.addEventListener('click', function() {
+        if (currentQuestionIndex < examQuestions.length - 1) {
+          currentQuestionIndex++;
+          displayQuestion(currentQuestionIndex);
+        }
+      });
+      
+      // Handle exam submission
+      submitExamButton.addEventListener('click', function() {
+        examSubmitted = true;
+        
+        // Calculate score
+        let correctAnswers = 0;
+        for (let i = 0; i < examQuestions.length; i++) {
+          if (userAnswers[i] === examQuestions[i].correctAnswer) {
+            correctAnswers++;
+          }
+        }
+        
+        // Update results UI
+        examScore.textContent = `${correctAnswers}/${examQuestions.length}`;
+        const scorePercentage = (correctAnswers / examQuestions.length) * 100;
+        scoreBar.style.width = `${scorePercentage}%`;
+        
+        // Show results
+        submitContainer.classList.add('hidden');
+        resultsContainer.classList.remove('hidden');
+        
+        // Disable question navigation
+        prevQuestionButton.disabled = true;
+        nextQuestionButton.disabled = true;
+      });
+      
+      // Handle show answers button
+      showAnswersButton.addEventListener('click', function() {
+        displayQuestion(currentQuestionIndex, true);
+        showAnswersButton.disabled = true;
+        
+        // Enable question navigation again
+        prevQuestionButton.disabled = currentQuestionIndex === 0;
+        nextQuestionButton.disabled = currentQuestionIndex === examQuestions.length - 1;
+      });
+      
+      // Handle restart button
+      restartExamButton.addEventListener('click', function() {
+        // Reset UI to form state
+        examPlaceholder.classList.remove('hidden');
+        examContent.classList.add('hidden');
+        resultsContainer.classList.add('hidden');
+        submitContainer.classList.add('hidden');
+        showAnswersButton.disabled = false;
+      });
+      
+      // Function to display a question
+      function displayQuestion(index, showExplanation = false) {
+        currentQuestionIndex = index;
+        currentQuestionSpan.textContent = index + 1;
+        
+        // Update navigation buttons
+        prevQuestionButton.disabled = index === 0;
+        nextQuestionButton.disabled = index === examQuestions.length - 1;
+        
+        // Show submit button on last question
+        if (index === examQuestions.length - 1 && !examSubmitted) {
+          nextQuestionButton.classList.add('hidden');
+          submitContainer.classList.remove('hidden');
+        } else {
+          nextQuestionButton.classList.remove('hidden');
+          submitContainer.classList.add('hidden');
+        }
+        
+        // Get current question
+        const question = examQuestions[index];
+        
+        // Build question HTML
+        let questionHTML = `
+          <div class="question">
+            <h3 class="text-xl font-bold mb-4">${index + 1}. ${question.text}</h3>
+            <div class="options">
+        `;
+        
+        // Add options
+        question.options.forEach((option, optionIndex) => {
+          let optionClass = 'option';
+          
+          if (userAnswers[index] === optionIndex) {
+            optionClass += ' selected';
+          }
+          
+          if (showExplanation) {
+            if (optionIndex === question.correctAnswer) {
+              optionClass += ' correct';
+            } else if (userAnswers[index] === optionIndex) {
+              optionClass += ' incorrect';
+            }
+          }
+          
+          questionHTML += `
+            <div class="${optionClass}" data-index="${optionIndex}">
+              <span class="mr-3">${String.fromCharCode(65 + optionIndex)}.</span>
+              <span>${option}</span>
+            </div>
+          `;
+        });
+        
+        questionHTML += `</div>`;
+        
+        // Add explanation if showing answers
+        if (showExplanation) {
+          questionHTML += `
+            <div class="explanation visible">
+              <h4 class="font-bold mb-2">Explanation:</h4>
+              <p>${question.explanation}</p>
+            </div>
+          `;
+        }
+        
+        questionHTML += `</div>`;
+        
+        // Update container
+        questionsContainer.innerHTML = questionHTML;
+        
+        // Add click handlers for options if not submitted
+        if (!examSubmitted || showExplanation) {
+          const options = document.querySelectorAll('.option');
+          options.forEach(option => {
+            option.addEventListener('click', function() {
+              if (examSubmitted && !showExplanation) return;
+              
+              const optionIndex = parseInt(this.getAttribute('data-index'));
+              userAnswers[currentQuestionIndex] = optionIndex;
+              
+              // Update selected state
+              options.forEach(opt => opt.classList.remove('selected'));
+              this.classList.add('selected');
+            });
+          });
+        }
+      }
+      
+      // Function to generate dummy exam data for testing
+      function generateDummyExam(topic, count, difficulty) {
+        const dummyData = [];
+        const difficultyFactor = difficulty === 'beginner' ? 'basic' : 
+                               difficulty === 'intermediate' ? 'intermediate' : 'advanced';
+        
+        for (let i = 0; i < count; i++) {
+          const options = [
+            `Option A for question ${i + 1}`,
+            `Option B for question ${i + 1}`,
+            `Option C for question ${i + 1}`,
+            `Option D for question ${i + 1}`
+          ];
+          
+          const correctAnswer = Math.floor(Math.random() * 4);
+          
+          dummyData.push({
+            id: i + 1,
+            text: `${difficultyFactor.charAt(0).toUpperCase() + difficultyFactor.slice(1)} question about ${topic} (#${i + 1})`,
+            options: options,
+            correctAnswer: correctAnswer,
+            explanation: `This is the explanation for question ${i + 1}. The correct answer is ${String.fromCharCode(65 + correctAnswer)} because of specific medical reasons related to ${topic}.`
+          });
+        }
+        
+        return dummyData;
+      }
+    });
+  </script>
+</body>
+</html> 
