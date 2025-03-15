@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="chat-main-content">
+    <div class="messages">
+        <!-- Welcome screen will be added here by JavaScript -->
+    </div>
+    
+    <div class="chat-input-container">
+        <form class="chat-form">
+            <div class="input-group">
+                <textarea id="message-input" class="chat-input" placeholder="Ask me anything about medicine..." rows="1" maxlength="4000"></textarea>
+                <button type="submit" class="send-button" aria-label="Send message">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"></path>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Include marked library for Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize chat interface
+    initializeChatInterface();
+});
+</script>
+{% endblock %} 

@@ -10,7 +10,7 @@ Integrates:
 - Flashcard Generator
 """
 
-from flask import Flask, render_template, send_from_directory, send_file, jsonify, request
+from flask import Flask, render_template, send_from_directory, send_file, jsonify, request, redirect
 from flask_cors import CORS
 import os
 import logging
@@ -19,12 +19,12 @@ from flask_socketio import SocketIO
 
 # Import routes from individual modules
 from study_calendar import initialize_calendar_materials, study_calendar_routes
-from exam import initialize_exam_materials, exam_routes
 from chatbot import initialize_chatbot, chatbot_routes
 from flashcard import initialize_course_materials, flashcard_routes
+from exam import exam_routes, initialize_exam_materials, load_feedback, load_student_profiles
 
 # Initialize logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -50,11 +50,15 @@ app.config['SECRET_KEY'] = os.urandom(24)
 # Enable insecure transport for development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-# Register blueprints for each module
+# Register blueprints
 app.register_blueprint(study_calendar_routes, url_prefix='/calendar')
-app.register_blueprint(exam_routes, url_prefix='/exam')
 app.register_blueprint(chatbot_routes, url_prefix='/chat')
 app.register_blueprint(flashcard_routes, url_prefix='/flashcard')
+app.register_blueprint(exam_routes, url_prefix='/exam')
+
+# Log available exam routes
+logger.info("Registering exam blueprint with prefix '/exam'")
+logger.info(f"Available exam routes: {[str(rule) for rule in app.url_map.iter_rules() if rule.endpoint.startswith('exam')]}")
 
 # Serve static files
 @app.route('/static/<path:path>')
@@ -70,95 +74,78 @@ def favicon():
 def logo():
     return send_from_directory(os.path.join(app.static_folder, 'dist'), 'logo.png')
 
-# API routes
-@app.route('/api/chat', methods=['POST'])
-def api_chat():
-    data = request.json
-    message = data.get('message', '')
-    # This is a placeholder - actual implementation would call your chatbot
-    response = f"You said: {message}. This is a placeholder response from the server."
-    return jsonify({"response": response})
-
-@app.route('/api/flashcards', methods=['POST'])
-def api_flashcards():
-    data = request.json
-    topic = data.get('topic', '')
-    count = int(data.get('count', 10))
-    difficulty = data.get('difficulty', 'intermediate')
-    
-    # This is a placeholder - actual implementation would generate flashcards
-    flashcards = []
-    for i in range(count):
-        flashcards.append({
-            "id": i + 1,
-            "question": f"{difficulty.capitalize()} question about {topic} (#{i + 1})",
-            "answer": f"This is a {difficulty} answer about {topic}. It would contain detailed information relevant to the question."
-        })
-    
-    return jsonify({"flashcards": flashcards})
-
-@app.route('/api/exams', methods=['POST'])
-def api_exams():
-    data = request.json
-    topic = data.get('topic', '')
-    count = int(data.get('count', 10))
-    difficulty = data.get('difficulty', 'intermediate')
-    
-    # This is a placeholder - actual implementation would generate exam questions
-    questions = []
-    for i in range(count):
-        options = [
-            f"Option A for question {i + 1}",
-            f"Option B for question {i + 1}",
-            f"Option C for question {i + 1}",
-            f"Option D for question {i + 1}"
-        ]
-        
-        correct_answer = i % 4  # Simple pattern for correct answers
-        
-        questions.append({
-            "id": i + 1,
-            "text": f"{difficulty.capitalize()} question about {topic} (#{i + 1})",
-            "options": options,
-            "correctAnswer": correct_answer,
-            "explanation": f"This is the explanation for question {i + 1}. The correct answer is {chr(65 + correct_answer)} because of specific medical reasons related to {topic}."
-        })
-    
-    return jsonify({"questions": questions})
+# Serve Product Sans fonts
+@app.route('/product-sans/<path:filename>')
+def product_sans_fonts(filename):
+    return send_from_directory(os.path.join(app.root_path, 'product-sans'), filename)
 
 # Main routes to serve HTML files
 @app.route('/')
 def index():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'index.html')
+    """Render the main index page."""
+    return render_template('index.html')
 
 @app.route('/chat')
 def chat():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'chat.html')
+    """Redirect to the main page with the chat tool active."""
+    return redirect('/#chatbot')
 
-@app.route('/flashcards')
+@app.route('/flashcard')
 def flashcards():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'flashcards.html')
+    """Redirect to the main page with the flashcards tool active."""
+    return redirect('/#flashcards')
+
+@app.route('/exam')
+def exams():
+    """Redirect to the main page with the practice exams tool active."""
+    return redirect('/#practice-exams')
 
 @app.route('/exams')
-def exams():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'exams.html')
+def exams_redirect():
+    """Redirect to the main page with the practice exams tool active."""
+    return redirect('/#practice-exams')
 
 @app.route('/calendar')
-def calendar():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'calendar.html')
+def calendar_redirect():
+    """Redirect to the main page with the calendar tool active."""
+    return redirect('/#study-planner')
 
-# Catch-all route for any other paths
+# Special route to help with debugging
+@app.route('/debug')
+def debug_info():
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': [m for m in rule.methods if m != 'OPTIONS' and m != 'HEAD'],
+            'url': str(rule)
+        })
+    
+    return jsonify({
+        'routes': routes,
+        'blueprints': list(app.blueprints.keys())
+    })
+
+# Catch-all route for SPA (React) routing
 @app.route('/<path:path>')
 def catch_all(path):
-    # Check if the path exists as an HTML file
-    html_path = f"{path}.html"
-    dist_dir = os.path.join(app.static_folder, 'dist')
+    logger.info(f"Catch-all route accessed: /{path}")
     
-    if os.path.exists(os.path.join(dist_dir, html_path)):
-        return send_from_directory(dist_dir, html_path)
+    # First, try direct file match in dist directory
+    file_path = os.path.join(app.static_folder, 'dist', f"{path}.html")
+    if os.path.exists(file_path):
+        logger.info(f"Serving specific file: {path}.html")
+        return send_from_directory(os.path.join(app.static_folder, 'dist'), f"{path}.html")
     
-    # If not found, return the index page
-    return send_from_directory(dist_dir, 'index.html')
+    # Next, try direct file match (for non-HTML files like CSS/JS)
+    file_path = os.path.join(app.static_folder, 'dist', path)
+    if os.path.exists(file_path):
+        logger.info(f"Serving asset file: {path}")
+        return send_from_directory(os.path.join(app.static_folder, 'dist'), path)
+    
+    # If no match, default to index.html for SPA routing
+    logger.info(f"No direct file match for '{path}', serving index.html (SPA routing)")
+    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'index.html')
 
 def initialize_all():
     """Initialize all required components."""
@@ -167,10 +154,6 @@ def initialize_all():
         initialize_calendar_materials()
         logger.info("Study calendar materials initialized")
         
-        # Initialize exam generator
-        initialize_exam_materials()
-        logger.info("Exam generator materials initialized")
-        
         # Initialize chatbot
         initialize_chatbot()
         logger.info("Chatbot initialized")
@@ -178,6 +161,12 @@ def initialize_all():
         # Initialize flashcard system
         initialize_course_materials()
         logger.info("Flashcard materials initialized")
+        
+        # Initialize exam system
+        initialize_exam_materials()
+        load_feedback()
+        load_student_profiles()
+        logger.info("Exam materials initialized")
         
         logger.info("All components initialized successfully")
     except Exception as e:
@@ -208,8 +197,8 @@ if __name__ == '__main__':
     initialize_all()
     
     # Start server
-    port = int(os.environ.get('PORT', 5000))
-    logger.info(f"Starting unified server on port {port}")
+    port = int(os.environ.get('PORT', 8080))
+    logger.info(f"Starting server on port {port}")
     try:
         socketio.run(app, host='0.0.0.0', port=port, debug=True, allow_unsafe_werkzeug=True)
     except Exception as e:

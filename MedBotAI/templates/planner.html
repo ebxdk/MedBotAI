@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div id="planner-view" class="tool-view">
+    <div class="planner-container">
+        <form class="planner-form">
+            <div class="form-group">
+                <label for="syllabus-upload" class="file-upload-label">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                        <polyline points="13 2 13 9 20 9"></polyline>
+                    </svg>
+                    <span>Upload Syllabus (PDF)</span>
+                    <input 
+                        type="file" 
+                        id="syllabus-upload" 
+                        accept=".pdf"
+                        required
+                        style="display: none;"
+                    >
+                </label>
+                <div class="selected-file"></div>
+            </div>
+
+            <div class="date-range">
+                <div class="form-group">
+                    <label for="start-date">Start Date</label>
+                    <input 
+                        type="date" 
+                        id="start-date" 
+                        class="form-control"
+                        required
+                    >
+                </div>
+                <div class="form-group">
+                    <label for="end-date">End Date</label>
+                    <input 
+                        type="date" 
+                        id="end-date" 
+                        class="form-control"
+                        required
+                    >
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="study-hours">Daily Study Hours</label>
+                <input 
+                    type="number" 
+                    id="study-hours" 
+                    class="form-control"
+                    min="1" 
+                    max="12" 
+                    value="4"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="primary-button">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                Generate Study Plan
+            </button>
+        </form>
+
+        <div id="planner-loading"></div>
+        <div id="planner-error"></div>
+
+        <div class="calendar-container">
+            <div class="calendar-header">
+                <button class="prev-month">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"></path>
+                    </svg>
+                </button>
+                <h2 class="current-month">Month Year</h2>
+                <button class="next-month">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="calendar-grid">
+                <div class="calendar-days">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+                <div class="calendar-dates">
+                    <!-- Calendar dates will be added dynamically -->
+                </div>
+            </div>
+
+            <div class="study-plan-details">
+                <h3>Study Plan Details</h3>
+                <div class="study-topics">
+                    <!-- Study topics will be added dynamically -->
+                </div>
+            </div>
+
+            <div class="export-controls">
+                <button class="export-calendar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export to Calendar
+                </button>
+                <button class="download-pdf">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

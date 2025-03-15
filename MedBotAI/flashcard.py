@@ -8,7 +8,7 @@ AI-Powered Flashcard Generator
 - Generates AI-powered flashcards
 """
 
-from flask import Flask, request, jsonify, render_template, Blueprint
+from flask import Flask, request, jsonify, render_template, Blueprint, session
 from flask_cors import CORS
 from dotenv import load_dotenv
 import openai
@@ -136,7 +136,7 @@ def search_relevant_chunks(query, top_k=3):
         logger.error(f"Error searching relevant chunks: {str(e)}")
         raise
 
-def generate_flashcards_with_context(context):
+def generate_flashcards_with_context(context, num_cards=10, difficulty='intermediate'):
     """Generates AI-powered flashcards using retrieved course content."""
     try:
         prompt = f"""
@@ -146,25 +146,22 @@ def generate_flashcards_with_context(context):
         
         {context}
         
-        Based ONLY on the above reference material, generate 10 high-quality flashcards in JSON format.
+        Based ONLY on the above reference material, generate {num_cards} high-quality {difficulty}-level flashcards in JSON format.
         Each flashcard should:
         
         1. Focus on a key concept, definition, or relationship from the material
-        2. Include a "question" field that is clear and specific
-        3. Include an "answer" field that is concise yet comprehensive
+        2. Have a "front" field for the question/prompt
+        3. Have a "back" field for the answer/explanation
         4. Be directly relevant to the provided context (don't make up information)
-        5. Vary between different question types (multiple-choice, fill-in-the-blank, true/false, open-ended)
+        5. Match the {difficulty} difficulty level in terms of complexity and detail
         6. Progress from simpler to more complex concepts
         
-        For multiple-choice questions, include options in the question field and the correct answer in the answer field.
-        
         Return ONLY a JSON array of flashcard objects with no additional text or explanation.
-        Each object should have exactly two fields: "question" and "answer".
+        Each object should have exactly two fields: "front" and "back".
         """
 
         logger.info("Sending request to OpenAI for flashcard generation")
         
-        # Using new OpenAI API format
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
@@ -225,6 +222,8 @@ def generate_flashcards():
         university = data.get('university', '').strip()
         course = data.get('course', '').strip()
         topic = data.get('topic', '').strip()
+        num_cards = int(data.get('num_cards', 10))
+        difficulty = data.get('difficulty', 'intermediate')
 
         if not all([university, course, topic]):
             return jsonify({"error": "All fields are required"}), 400
@@ -239,20 +238,21 @@ def generate_flashcards():
         # Extract and format context
         context = "\n\n".join([chunk["text"] for chunk in relevant_chunks])
         
-        # Generate flashcards
-        logger.info("Generating flashcards from context")
-        flashcards = generate_flashcards_with_context(context)
+        # Generate flashcards with specified parameters
+        logger.info(f"Generating {num_cards} {difficulty} flashcards from context")
+        flashcards = generate_flashcards_with_context(context, num_cards, difficulty)
         
-        # Include sources in response
-        sources = [{"course": chunk.get("course", "Unknown"), 
-                   "university": chunk.get("university", "Unknown"),
-                   "chunk_id": chunk.get("chunk_id", 0)} 
-                  for chunk in relevant_chunks]
+        # Store context in session for regeneration
+        if 'flashcard_contexts' not in session:
+            session['flashcard_contexts'] = {}
+        session['flashcard_contexts'][topic] = {
+            'context': context,
+            'num_cards': num_cards,
+            'difficulty': difficulty
+        }
         
         return jsonify({
             "flashcards": flashcards,
-            "context": context,
-            "sources": sources,
             "message": "Flashcards generated successfully"
         })
 
@@ -262,20 +262,26 @@ def generate_flashcards():
 
 @flashcard_routes.route('/regenerate-flashcards', methods=['POST'])
 def regenerate_flashcards():
-    """Regenerate flashcards using the same context."""
+    """Regenerate flashcards using the same parameters."""
     try:
         data = request.json
-        context = data.get('context', '')
+        topic = data.get('topic', '').strip()
+        num_cards = int(data.get('num_cards', 10))
+        difficulty = data.get('difficulty', 'intermediate')
         
-        if not context:
-            return jsonify({"error": "No context provided"}), 400
+        # Get stored context for the topic
+        if 'flashcard_contexts' not in session or topic not in session['flashcard_contexts']:
+            # If no stored context, generate new flashcards
+            return generate_flashcards()
+            
+        stored_data = session['flashcard_contexts'][topic]
+        context = stored_data['context']
         
-        logger.info("Regenerating flashcards with existing context")
-        flashcards = generate_flashcards_with_context(context)
+        logger.info(f"Regenerating {num_cards} {difficulty} flashcards")
+        flashcards = generate_flashcards_with_context(context, num_cards, difficulty)
         
         return jsonify({
             "flashcards": flashcards,
-            "context": context,
             "message": "Flashcards regenerated successfully"
         })
 

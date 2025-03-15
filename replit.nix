@@ -5,5 +5,6 @@
     pkgs.valkey
     pkgs.nano
     pkgs.cowsay
+    pkgs.tesseract
   ];
 }

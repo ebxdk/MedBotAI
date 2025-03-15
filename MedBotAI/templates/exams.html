@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedBot AI - Exam Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .exam-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .exam-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .exam-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .exam-form input, .exam-form select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .exam-form button {
+            grid-column: span 2;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .exam-form button:hover {
+            background-color: #45a049;
+        }
+        
+        .exam-content {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+        }
+        
+        .exam-content h1 {
+            font-size: 24px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .exam-content h2 {
+            font-size: 20px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        
+        .exam-content h3 {
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .exam-content ol, .exam-content ul {
+            padding-left: 25px;
+            margin-bottom: 15px;
+        }
+        
+        .exam-content li {
+            margin-bottom: 8px;
+        }
+        
+        .exam-content pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        .feedback-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .feedback-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .good-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .bad-button {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            font-style: italic;
+            color: #666;
+        }
+        
+        .improvements {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fffde7;
+            border-left: 4px solid #ffd600;
+            border-radius: 4px;
+        }
+        
+        .exam-metadata {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        /* Download button */
+        .download-button {
+            background-color: #ff9800;
+            color: white;
+        }
+        
+        /* Print styles */
+        @media print {
+            header, .exam-form, .feedback-buttons {
+                display: none;
+            }
+            
+            .exam-container {
+                box-shadow: none;
+                margin: 0;
+                padding: 0;
+            }
+            
+            .exam-content {
+                border: none;
+                padding: 0;
+                background: none;
+            }
+        }
+        
+        .method-description {
+            margin-top: 5px;
+            font-style: italic;
+            color: #666;
+        }
+        
+        /* Add a loading spinner */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4CAF50;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">MedBot AI</div>
+        <nav>
+            <ul>
+                <li><a href="/">Chat</a></li>
+                <li><a href="/flashcard">Flashcards</a></li>
+                <li><a href="/exam" class="active">Exams</a></li>
+                <li><a href="/calendar">Study Planner</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="exam-container">
+            <h1>AI-Powered Exam Generator</h1>
+            <p>Generate custom practice exams based on your course materials and preferences.</p>
+            
+            <div class="exam-form">
+                <div>
+                    <label for="university">University/Institution:</label>
+                    <input type="text" id="university" placeholder="e.g., Harvard University">
+                </div>
+                
+                <div>
+                    <label for="course">Course Name:</label>
+                    <input type="text" id="course" placeholder="e.g., Data Structures and Algorithms">
+                </div>
+                
+                <div>
+                    <label for="exam-type">Exam Type:</label>
+                    <select id="exam-type">
+                        <option value="midterm">Midterm</option>
+                        <option value="final">Final</option>
+                        <option value="quiz">Quiz</option>
+                        <option value="practice">Practice</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="difficulty">Difficulty Level:</label>
+                    <select id="difficulty">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="generation-method">Generation Method:</label>
+                    <select id="generation-method">
+                        <option value="high_quality" selected>High Quality (Best Results)</option>
+                        <option value="direct">Direct PDF (Faster)</option>
+                        <option value="rag">RAG (Retrieval-Augmented Generation)</option>
+                    </select>
+                    <p class="method-description">
+                        <small>High Quality: Two-step process that analyzes exam structure in detail before generating.</small>
+                    </p>
+                </div>
+                
+                <button id="generate-button">Generate Exam</button>
+            </div>
+            
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Generating your exam... This may take a minute.</p>
+            </div>
+            
+            <div id="exam-output" style="display: none;">
+                <div id="exam-metadata" class="exam-metadata">
+                    <h2 id="exam-title"></h2>
+                    <p id="exam-details"></p>
+                </div>
+                
+                <div id="exam-content" class="exam-content"></div>
+                
+                <div class="feedback-buttons">
+                    <button id="good-feedback" class="feedback-button good-button">👍 Good Exam</button>
+                    <button id="bad-feedback" class="feedback-button bad-button">👎 Needs Improvement</button>
+                    <button id="print-exam" class="feedback-button" style="background-color: #2196F3; color: white;">🖨️ Print Exam</button>
+                    <button id="download-exam" class="feedback-button download-button">💾 Download PDF</button>
+                </div>
+                
+                <div id="improvements" class="improvements" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateButton = document.getElementById('generate-button');
+            const loadingDiv = document.getElementById('loading');
+            const examOutput = document.getElementById('exam-output');
+            const examTitle = document.getElementById('exam-title');
+            const examDetails = document.getElementById('exam-details');
+            const examContent = document.getElementById('exam-content');
+            const goodFeedback = document.getElementById('good-feedback');
+            const badFeedback = document.getElementById('bad-feedback');
+            const improvementsDiv = document.getElementById('improvements');
+            const printButton = document.getElementById('print-exam');
+            const downloadButton = document.getElementById('download-exam');
+            
+            // Generate exam
+            generateButton.addEventListener('click', function() {
+                const university = document.getElementById('university').value.trim();
+                const course = document.getElementById('course').value.trim();
+                const examType = document.getElementById('exam-type').value;
+                const difficulty = document.getElementById('difficulty').value;
+                const method = document.getElementById('generation-method').value;
+                
+                if (!university || !course) {
+                    alert('Please enter both university and course name.');
+                    return;
+                }
+                
+                // Show loading, hide results
+                loadingDiv.style.display = 'block';
+                examOutput.style.display = 'none';
+                improvementsDiv.style.display = 'none';
+                
+                // Make API request
+                fetch('/exam/generate-exam', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        university: university,
+                        course: course,
+                        exam_type: examType,
+                        difficulty: difficulty,
+                        method: method
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Failed to generate exam');
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Hide loading, show results
+                    loadingDiv.style.display = 'none';
+                    examOutput.style.display = 'block';
+                    
+                    // Set exam metadata
+                    examTitle.textContent = `${data.exam_type.toUpperCase()} EXAM: ${data.course}`;
+                    examDetails.textContent = `${data.university} | Difficulty: ${data.difficulty}`;
+                    
+                    // Display exam content directly since it's already formatted text
+                    examContent.innerHTML = data.content || "No exam content generated.";
+                })
+                .catch(error => {
+                    loadingDiv.style.display = 'none';
+                    alert('Error: ' + error.message);
+                });
+            });
+            
+            // Helper: Format array of question objects - REMOVED AS NOT NEEDED
+            // function formatExamQuestions(questions) { ... }
+            
+            // Submit good feedback
+            goodFeedback.addEventListener('click', function() {
+                submitFeedback('good');
+            });
+            
+            // Submit bad feedback
+            badFeedback.addEventListener('click', function() {
+                submitFeedback('bad');
+            });
+            
+            // Print exam
+            printButton.addEventListener('click', function() {
+                window.print();
+            });
+            
+            // Download exam as PDF
+            downloadButton.addEventListener('click', function() {
+                // Create a simple alert for now - PDF generation would require additional libraries
+                alert('PDF download functionality requires additional setup. For now, please use the Print button and save as PDF.');
+            });
+            
+            // Submit feedback to API
+            function submitFeedback(rating) {
+                fetch('/exam/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        rating: rating,
+                        comments: `User rated the exam as ${rating}`
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.improvements && rating === 'bad') {
+                        improvementsDiv.style.display = 'block';
+                        improvementsDiv.innerHTML = `<h3>How We'll Improve:</h3><p>${data.improvements.replace(/\n/g, '<br>')}</p>`;
+                    } else {
+                        improvementsDiv.style.display = 'none';
+                    }
+                    
+                    alert(`Thank you for your ${rating} feedback!`);
+                })
+                .catch(error => {
+                    console.error('Error submitting feedback:', error);
+                    alert('Failed to submit feedback. Please try again.');
+                });
+            }
+            
+            // Update generation method description on change
+            document.getElementById('generation-method').addEventListener('change', function() {
+                const methodDescription = document.querySelector('.method-description small');
+                if (this.value === 'high_quality') {
+                    methodDescription.textContent = 'High Quality: Two-step process that analyzes exam structure in detail before generating.';
+                } else if (this.value === 'direct') {
+                    methodDescription.textContent = 'Direct PDF: Sends entire exam PDFs to the AI for better structure preservation.';
+                } else {
+                    methodDescription.textContent = 'RAG: Uses AI to retrieve relevant chunks of information from course materials.';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

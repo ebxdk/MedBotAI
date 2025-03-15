@@ -61,14 +61,24 @@ def initialize_chatbot():
     """Initialize the chatbot module"""
     logger.info("Initializing chatbot module...")
     
-    # Ensure OpenAI API key is set
-    if not os.getenv('OPENAI_API_KEY'):
-        logger.warning("⚠️ WARNING: OPENAI_API_KEY not set in environment")
+    # Validate OpenAI API key
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        logger.error("❌ ERROR: OPENAI_API_KEY not set in environment")
+        return False
+    
+    try:
+        # Test API key validity
+        client = OpenAI(api_key=api_key)
+        client.models.list()  # This will fail if the API key is invalid
+        logger.info("✅ OpenAI API key validated successfully")
+    except Exception as e:
+        logger.error(f"❌ ERROR: Invalid OpenAI API key - {str(e)}")
         return False
     
     # Initialize RAG pipeline
     if not initialize_rag():
-        logger.error("Failed to initialize RAG pipeline")
+        logger.error("❌ ERROR: Failed to initialize RAG pipeline")
         return False
     
     logger.info("✅ Chatbot module initialized successfully")
@@ -76,7 +86,7 @@ def initialize_chatbot():
 
 @chatbot_routes.route('/')
 def index():
-    return render_template('chatbot.html')
+    return render_template('chat.html')
 
 @chatbot_routes.route('/upload', methods=['POST'])
 def upload_file():
@@ -136,7 +146,11 @@ def chat():
                 rag_pipeline = get_rag_pipeline()
                 context = ""
                 if rag_pipeline:
-                    context = rag_pipeline.get_relevant_context(user_input)
+                    try:
+                        context = rag_pipeline.get_relevant_context(user_input)
+                    except Exception as e:
+                        logger.warning(f"Warning: RAG pipeline error - {str(e)}")
+                        # Continue without context if RAG fails
                 
                 # Prepare conversation messages
                 messages = []
@@ -145,12 +159,26 @@ def chat():
                 if context:
                     messages.append({
                         "role": "system",
-                        "content": f"You are a medical AI assistant. Use the following context to help answer the question, but don't mention that you're using this context: {context}"
+                        "content": f"""You are a medical AI assistant powered by advanced language models. You provide accurate, helpful medical information while being clear about your limitations. Use the following context to help answer questions, but don't mention that you're using this context: {context}
+
+Important guidelines:
+- Always be professional and empathetic
+- Cite medical sources when possible
+- Clearly state when information is general vs. specific
+- Encourage consulting healthcare professionals for specific medical advice
+- Use clear, simple language while maintaining medical accuracy"""
                     })
                 else:
                     messages.append({
                         "role": "system",
-                        "content": "You are a medical AI assistant. Provide accurate, helpful medical information while being clear about your limitations and encouraging users to consult healthcare professionals for specific medical advice."
+                        "content": """You are a medical AI assistant powered by advanced language models. You provide accurate, helpful medical information while being clear about your limitations.
+
+Important guidelines:
+- Always be professional and empathetic
+- Cite medical sources when possible
+- Clearly state when information is general vs. specific
+- Encourage consulting healthcare professionals for specific medical advice
+- Use clear, simple language while maintaining medical accuracy"""
                     })
                 
                 # Add conversation history
@@ -168,11 +196,13 @@ def chat():
                 
                 # Get streaming response from OpenAI
                 response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model="gpt-4-turbo-preview",  # Using GPT-4 for better medical knowledge
                     messages=messages,
                     stream=True,
                     temperature=0.7,
-                    max_tokens=1000
+                    max_tokens=2000,
+                    presence_penalty=0.6,  # Encourage more diverse responses
+                    frequency_penalty=0.3   # Reduce repetition
                 )
                 
                 # Stream the response
@@ -182,7 +212,8 @@ def chat():
                 
             except Exception as e:
                 logger.error(f"Error in generate_response: {str(e)}")
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                error_message = "I apologize, but I encountered an error. Please try again or contact support if the issue persists."
+                yield f"data: {json.dumps({'error': error_message})}\n\n"
             
             finally:
                 yield "data: [DONE]\n\n"
@@ -191,7 +222,9 @@ def chat():
         
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': 'An unexpected error occurred. Please try again or contact support.'
+        }), 500
 
 @chatbot_routes.route('/speak', methods=['POST'])
 def speak():
@@ -222,6 +255,38 @@ def speak():
     except Exception as e:
         logger.error(f"Error in speak endpoint: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@chatbot_routes.route('/test', methods=['GET'])
+def test():
+    """Simple test endpoint to check if the chatbot routes are accessible."""
+    logger.info("Test endpoint accessed")
+    return jsonify({'status': 'ok', 'message': 'Chatbot routes are accessible'})
+
+@chatbot_routes.route('/simple-chat', methods=['POST'])
+def simple_chat():
+    """A simple non-streaming version of the chat endpoint for testing."""
+    try:
+        logger.info("Simple chat endpoint accessed")
+        data = request.get_json()
+        user_input = data.get('message', '')
+        conversation_history = data.get('history', [])
+        
+        logger.info(f"Received message: {user_input}")
+        logger.info(f"Conversation history: {conversation_history}")
+        
+        if not user_input:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        # For testing, just return a simple response
+        return jsonify({
+            'content': f"You said: {user_input}. This is a test response from the server."
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in simple chat endpoint: {str(e)}")
+        return jsonify({
+            'error': 'An unexpected error occurred. Please try again or contact support.'
+        }), 500
 
 # ------------------------------------------------------------------------------
 # Main

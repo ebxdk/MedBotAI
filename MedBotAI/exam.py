@@ -1,57 +1,71 @@
 import os
 import logging
 import json
+import datetime
+import io
+from pathlib import Path
+
+import requests
 import numpy as np
+import faiss
 import fitz  # PyMuPDF
 import tiktoken
-import re
-import faiss
+import pytesseract
+from PIL import Image
 from rank_bm25 import BM25Okapi
+
 from flask import Flask, request, jsonify, render_template, Blueprint
 from flask_cors import CORS
-import openai
-from openai import OpenAI
-import glob
+from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# -------------------------------------------------
+# Setup Logging
+# -------------------------------------------------
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app
-app = Flask(
-    __name__,
-    template_folder=os.path.join(os.path.dirname(__file__), 'templates'),
-    static_folder=os.path.join(os.path.dirname(__file__), 'static')
-)
-CORS(app)
-
-# Create the blueprint
-exam_routes = Blueprint('exam', __name__)
-
-# Configure OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError("⚠️ ERROR: OPENAI_API_KEY not set in environment")
+# -------------------------------------------------
+# Flask Blueprint
+# -------------------------------------------------
+exam_routes = Blueprint('exam_routes', __name__)
 
 # -------------------------------------------------
-# 📌 Global Variables & Filenames
+# Load Environment
 # -------------------------------------------------
-feedback_history = []   # Stores user feedback
-improvement_history = []  # Stores GPT-generated improvements
-last_generated_exam = ""  # Stores the last exam for evaluation
-FEEDBACK_FILE = os.path.join(os.path.dirname(__file__), "feedback_history.json")
-STUDENT_DATA_FILE = os.path.join(os.path.dirname(__file__), "student_data.json")
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# -------------------------------------------------
+# Global Variables & Filenames
+# -------------------------------------------------
+feedback_history = []          # Stores user feedback
+improvement_history = []       # Stores GPT-generated improvements
+last_generated_exam = ""       # Stores the last exam (text) for evaluation
+FEEDBACK_FILE = "feedback_history.json"
+
+STUDENT_DATA_FILE = "student_data.json"
 student_profiles = {}
 
-# Global variables for FAISS indexes and chunks
+# The FAISS index and list of exam chunks from your PDFs
 exam_index = None
 practice_exams = []
-course_index = None
-course_chunks = []
-bm25 = None
+
+# Where your exam PDFs are located
+EXAMS_FOLDER = "exams"
 
 # -------------------------------------------------
-# 📌 Feedback / Student Data Persistence
+# File Upload Configuration (Optional)
+# -------------------------------------------------
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx'}
+Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# -------------------------------------------------
+# Feedback and Student Data Persistence
 # -------------------------------------------------
 def save_feedback():
     """Saves feedback and improvement history to a JSON file."""
@@ -59,8 +73,11 @@ def save_feedback():
         "feedback_history": feedback_history,
         "improvement_history": improvement_history
     }
-    with open(FEEDBACK_FILE, "w") as f:
-        json.dump(data, f)
+    try:
+        with open(FEEDBACK_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.error(f"Error saving feedback: {str(e)}")
 
 def load_feedback():
     """Loads feedback and improvement history from a JSON file."""
@@ -85,21 +102,22 @@ def load_student_profiles():
 
 def save_student_profiles():
     """Saves student performance data to a JSON file."""
-    with open(STUDENT_DATA_FILE, "w") as f:
-        json.dump(student_profiles, f)
+    try:
+        with open(STUDENT_DATA_FILE, "w") as f:
+            json.dump(student_profiles, f)
+    except Exception as e:
+        logger.error(f"Error saving student profiles: {str(e)}")
 
 def track_student_progress(student_id, feedback):
     """
-    Logs feedback under a specific student's history.
-    Currently unused in the UI, but available if you want
-    to incorporate student-specific tracking.
+    Logs feedback under a specific student's history and adjusts difficulty preference.
     """
     if student_id not in student_profiles:
         student_profiles[student_id] = {"feedback": [], "difficulty_preference": "Medium"}
 
     student_profiles[student_id]["feedback"].append(feedback)
 
-    # 🔥 Adjust difficulty based on feedback
+    # Simple difficulty logic
     if "too easy" in feedback.lower():
         student_profiles[student_id]["difficulty_preference"] = "Hard"
     elif "too hard" in feedback.lower():
@@ -110,33 +128,41 @@ def track_student_progress(student_id, feedback):
 def get_student_difficulty(student_id):
     """Retrieves the preferred difficulty level for a student."""
     if student_id in student_profiles:
-        return student_profiles[student_id]["difficulty_preference"]
-    return "Medium"  # default if no data available
+        return student_profiles[student_id].get("difficulty_preference", "Medium")
+    return "Medium"
 
 # -------------------------------------------------
-# 📌 Function: Extract Text from PDF (No OCR)
+# PDF Text Extraction (with OCR fallback)
 # -------------------------------------------------
-def extract_text_from_pdf(pdf_path):
-    """Extracts text from PDF without OCR."""
+def extract_text_with_ocr(pdf_path):
+    """
+    Extracts text from a PDF using PyMuPDF. If a page is effectively empty,
+    fallback to Tesseract OCR.
+    """
     text_data = []
     try:
         with fitz.open(pdf_path) as doc:
             for page in doc:
-                text = page.get_text("text").strip()
-                # Only add if the page isn't basically empty
-                if len(text) > 50:
-                    text_data.append(text)
-        return "\n".join(text_data)
+                page_text = page.get_text("text").strip()
+                if not page_text:
+                    # fallback to OCR
+                    pix = page.get_pixmap()
+                    img = Image.open(io.BytesIO(pix.tobytes()))
+                    page_text = pytesseract.image_to_string(img)
+                if len(page_text) > 50:
+                    text_data.append(page_text)
     except Exception as e:
-        logger.error(f"Error extracting text from PDF {pdf_path}: {str(e)}")
-        return ""
+        logger.error(f"Failed to read or OCR {pdf_path}: {str(e)}")
+    return "\n".join(text_data)
 
 # -------------------------------------------------
-# 📌 Function: Sentence-Aware (Token-Aware) Chunking
+# Chunking & Direct Embeddings (via requests)
 # -------------------------------------------------
+embedding_cache = {}
+
 def chunk_text(text, max_tokens=500):
     """
-    Splits text into chunks, ensuring each chunk is <= max_tokens
+    Splits text into chunks, ensuring each chunk is <= max_tokens tokens,
     based on the tiktoken 'cl100k_base' tokenizer.
     """
     encoding = tiktoken.get_encoding("cl100k_base")
@@ -159,415 +185,396 @@ def chunk_text(text, max_tokens=500):
 
     return chunks
 
-# -------------------------------------------------
-# 📌 Function: Generate OpenAI Embeddings with Caching
-# -------------------------------------------------
-embedding_cache = {}
-def generate_embedding(text):
-    """Generates embeddings for text with caching."""
+def call_openai_embedding(text):
+    """
+    Calls the /v1/embeddings endpoint via requests, bypassing openai.Embedding.
+    """
     if text in embedding_cache:
         return embedding_cache[text]
+
+    url = "https://api.openai.com/v1/embeddings"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
+    payload = {
+        "input": text,
+        "model": "text-embedding-ada-002"
+    }
+
     try:
-        response = client.embeddings.create(input=[text], model="text-embedding-ada-002")
-        embedding = response.data[0].embedding
-        embedding_cache[text] = embedding
-        return embedding
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        emb = data["data"][0]["embedding"]
+        embedding_cache[text] = emb
+        return emb
     except Exception as e:
-        logger.error(f"Error generating embedding: {str(e)}")
-        # Return a zero vector as fallback
-        return [0.0] * 1536
+        logger.error(f"Failed to get embedding for text: {str(e)}")
+        # Return a dummy vector if there's an error
+        return [0.0]*1536
 
 # -------------------------------------------------
-# 📌 Function: Store Practice Exams in a Single FAISS Index
+# Build FAISS Index for Exam PDFs
 # -------------------------------------------------
-def store_exams_faiss(pdf_paths):
+def store_exams_faiss(pdf_folder):
     """
-    Returns:
-      exam_index: faiss.IndexFlatL2
-      exam_chunks: list of dicts, each dict has:
-         {
-           "file_name": str,
-           "chunk_text": str,
-           "full_text": str  # entire PDF if needed,
-         }
+    Extracts text from each PDF in pdf_folder, chunks it, calls embeddings,
+    and stores them in a FAISS index. Returns the index and the chunk list.
     """
-    d = 1536  # Dimension for text-embedding-ada-002
+    import faiss
+    d = 1536
     index = faiss.IndexFlatL2(d)
     exam_chunks = []
 
-    # Collect all chunks first
+    pdf_files = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder)
+                 if f.lower().endswith(".pdf")]
+
+    # If no PDF files are found, create a dummy chunk
+    if not pdf_files:
+        logger.warning("No PDF files found in exams folder. Using a default template.")
+        dummy_text = """
+        Medical Exam
+        
+        Question 1: What is the primary function of the mitochondria?
+        A) Protein synthesis
+        B) Cellular respiration
+        C) DNA replication
+        D) Cell division
+        
+        Answer: B
+        Explanation: Mitochondria are known as the powerhouse of the cell and are responsible for cellular respiration, which produces ATP, the energy currency of the cell.
+        
+        Question 2: Which of the following is NOT a component of the limbic system?
+        A) Amygdala
+        B) Hippocampus
+        C) Cerebellum
+        D) Hypothalamus
+        
+        Answer: C
+        Explanation: The cerebellum is not part of the limbic system. It is responsible for motor control and coordination.
+        """
+        exam_chunks.append({
+            "file_name": "default_exam.pdf",
+            "chunk_text": dummy_text,
+            "full_text": dummy_text
+        })
+        
+        # Compute embedding for the dummy chunk
+        emb = call_openai_embedding(dummy_text)
+        index.add(np.array([emb]).astype("float32"))
+        return index, exam_chunks
+
     all_embeddings = []
-    for pdf_path in pdf_paths:
-        pdf_text = extract_text_from_pdf(pdf_path)
-        if not pdf_text:
-            logger.warning(f"No text extracted from {pdf_path}")
-            continue
-            
+    for pdf_path in pdf_files:
+        pdf_text = extract_text_with_ocr(pdf_path)
         chunks = chunk_text(pdf_text)
-        for chunk in chunks:
+        for ch in chunks:
             exam_chunks.append({
                 "file_name": os.path.basename(pdf_path),
-                "chunk_text": chunk,
+                "chunk_text": ch,
                 "full_text": pdf_text
             })
 
     # Compute embeddings for each chunk
     for chunk_data in exam_chunks:
-        emb = generate_embedding(chunk_data["chunk_text"])
+        emb = call_openai_embedding(chunk_data["chunk_text"])
         all_embeddings.append(emb)
 
-    # Add to FAISS if we have embeddings
-    if all_embeddings:
-        index.add(np.array(all_embeddings).astype("float32"))
-    
+    index.add(np.array(all_embeddings).astype("float32"))
     return index, exam_chunks
 
 # -------------------------------------------------
-# 📌 Function: Store Course Material in FAISS + BM25
-# -------------------------------------------------
-def store_course_material_faiss(pdf_path):
-    """Stores course material in FAISS and BM25 indexes."""
-    d = 1536
-    index = faiss.IndexFlatL2(d)
-
-    pdf_text = extract_text_from_pdf(pdf_path)
-    if not pdf_text:
-        logger.warning(f"No text extracted from {pdf_path}")
-        # Return empty indexes with a safe BM25 initialization
-        return index, [], BM25Okapi([["placeholder"]])
-        
-    chunks = chunk_text(pdf_text)
-    chunk_embeddings = [generate_embedding(ch) for ch in chunks]
-    
-    if chunk_embeddings:
-        index.add(np.array(chunk_embeddings).astype("float32"))
-
-    # Build BM25 from tokenized chunks
-    tokenized_corpus = [ch.split() for ch in chunks]
-    if not tokenized_corpus:
-        # Ensure we have at least one token to prevent division by zero
-        tokenized_corpus = [["placeholder"]]
-    bm25 = BM25Okapi(tokenized_corpus)
-
-    return index, chunks, bm25
-
-# -------------------------------------------------
-# 📌 Function: Retrieve Practice Exam
+# Retrieval
 # -------------------------------------------------
 def retrieve_practice_exam(query, exam_index, exam_chunks, top_k=1):
     """
-    Returns the full_text from the chunk that best matches `query`.
+    Searches the FAISS index for the chunk that best matches 'query',
+    then returns the 'full_text' from that chunk as the reference exam text.
     """
-    if not exam_chunks:
-        logger.warning("No exam chunks available for retrieval")
-        return "No past exam reference available. The exam will be generated based on general knowledge."
-        
-    query_emb = np.array([generate_embedding(query)]).astype("float32")
-    
+    if exam_index is None or not exam_chunks:
+        logger.warning("No exam index or chunks available. Using an empty string.")
+        return ""
+
     try:
+        query_emb = np.array([call_openai_embedding(query)]).astype("float32")
         distances, indices = exam_index.search(query_emb, top_k)
+
+        if len(indices[0]) == 0:
+            logger.warning("No matching chunks found. Using the first available chunk.")
+            return exam_chunks[0]["full_text"] if exam_chunks else ""
+
+        top_chunk = exam_chunks[indices[0][0]]
+        return top_chunk["full_text"]
     except Exception as e:
-        logger.error(f"Error searching exam index: {str(e)}")
-        return exam_chunks[0]["full_text"] if exam_chunks else "Error retrieving past exam. The exam will be generated based on general knowledge."
-
-    # If nothing found, default to the first chunk's full text
-    if len(indices[0]) == 0:
-        return exam_chunks[0]["full_text"] if exam_chunks else "No relevant past exam found. The exam will be generated based on general knowledge."
-
-    # Return the full text of the top chunk
-    top_chunk = exam_chunks[indices[0][0]]
-    return top_chunk["full_text"]
+        logger.error(f"Error during exam retrieval: {str(e)}")
+        return ""
 
 # -------------------------------------------------
-# 📌 Function: Retrieve Course Material (Hybrid: FAISS + BM25)
+# Chat Completion via requests (GPT-3.5-turbo)
 # -------------------------------------------------
-def retrieve_course_material(query, course_index, course_chunks, bm25, top_k=3):
-    """Retrieves relevant course material using hybrid search."""
-    if not course_chunks:
-        logger.warning("No course chunks available for retrieval")
-        return ["No course material available. The exam will be generated based on general knowledge."]
-        
-    query_emb = np.array([generate_embedding(query)]).astype("float32")
-    
-    try:
-        distances, indices = course_index.search(query_emb, top_k)
-    except Exception as e:
-        logger.error(f"Error searching course index: {str(e)}")
-        # Fallback to BM25
-        try:
-            top_bm25 = bm25.get_top_n(query.split(), course_chunks, n=top_k)
-            return top_bm25 if top_bm25 else ["No relevant course material found. Using general knowledge."]
-        except Exception as e2:
-            logger.error(f"Error with BM25 fallback: {str(e2)}")
-            return ["Error retrieving course material. The exam will be generated based on general knowledge."]
-
-    # If FAISS yields no results
-    if len(indices[0]) == 0:
-        # fallback to BM25
-        try:
-            top_bm25 = bm25.get_top_n(query.split(), course_chunks, n=top_k)
-            return top_bm25 if top_bm25 else ["No relevant course material found. Using general knowledge."]
-        except Exception as e:
-            logger.error(f"Error with BM25 fallback: {str(e)}")
-            return ["Error retrieving course material. The exam will be generated based on general knowledge."]
-
-    # Return top K chunk texts
-    results = [course_chunks[i] for i in indices[0]]
-    return results
-
-# -------------------------------------------------
-# 📌 Function: Generate AI-Powered Practice Exam
-# -------------------------------------------------
-def generate_practice_exam(course, difficulty):
+def call_openai_chat(messages, temperature=0.7, max_tokens=1500):
     """
-    Generates an advanced exam using GPT,
-    closely matching the style of past exams and course material.
+    Directly calls the /v1/chat/completions endpoint using requests.
+    """
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
+    }
+    payload = {
+        "model": "gpt-3.5-turbo",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"Failed to get chat completion: {str(e)}")
+        return "Error generating exam from Chat API."
+
+# -------------------------------------------------
+# Generate a New Exam (Mimicking Past Exams)
+# -------------------------------------------------
+def generate_practice_exam_realtime(course, exam_type, difficulty):
+    """
+    1) Retrieve a 'past exam reference' chunk by searching for 'course'.
+    2) Construct a robust prompt that replicates the style, structure, and difficulty
+       of that reference while introducing new but similarly challenging questions.
+    3) Return the final exam text.
     """
     global last_generated_exam
 
-    # Retrieve practice exam reference & relevant course chunks
+    # Retrieve the chunk that best matches the 'course'
     exam_text = retrieve_practice_exam(course, exam_index, practice_exams)
-    course_material = retrieve_course_material(course, course_index, course_chunks, bm25, top_k=3)
+    
+    # If no exam text is retrieved or it's too short, use a default template
+    if not exam_text or len(exam_text) < 100:
+        logger.warning("No suitable exam reference found. Using a default template.")
+        exam_text = """
+        Medical Exam
+        
+        Question 1: What is the primary function of the mitochondria?
+        A) Protein synthesis
+        B) Cellular respiration
+        C) DNA replication
+        D) Cell division
+        
+        Answer: B
+        Explanation: Mitochondria are known as the powerhouse of the cell and are responsible for cellular respiration, which produces ATP, the energy currency of the cell.
+        
+        Question 2: Which of the following is NOT a component of the limbic system?
+        A) Amygdala
+        B) Hippocampus
+        C) Cerebellum
+        D) Hypothalamus
+        
+        Answer: C
+        Explanation: The cerebellum is not part of the limbic system. It is responsible for motor control and coordination.
+        """
 
     # Combine improvements from negative feedback
     combined_improvements = "\n".join(improvement_history)
 
-    # Build the context from relevant text
-    context = (
-        f"--- Past Exam Reference ---\n{exam_text}\n\n"
-        f"--- Relevant Course Chunks ---\n" + "\n\n".join(course_material)
-    )
-
-    # Advanced Prompt Engineering
-    system_prompt = """\
-You are a highly specialized AI in creating university-level computer science exams.
-Your primary objective:
-1. Closely match the tone, style, and structure of the provided past exams. produce the same number of questions, if not, more questions than whats included in the practice exams.
-2. Incorporate relevant course content from the retrieved chunks to ensure coverage of essential topics.
-3. Make the resulting exam as comprehensive and realistic as possible, so that a diligent student can ACE their real exam.
-4. Use rigorous academic standards, but remain accessible and properly structured.
-5. Keep your chain-of-thought internal. Output only the final refined exam text.
-
-Formatting Requirements:
-- Use headings for different sections (e.g., Section A: Multiple Choice, Section B: Short Answer).
-- Provide clear instructions and question numbering.
-- For coding problems (Java), use valid fenced code blocks: ```java ... ```
-- If needed, illustrate data structures or algorithms in text or ASCII.
-- Keep explanations minimal in the final output to mirror real exam conditions unless a solution or answer key is explicitly requested (not included here by default).
+    # System instructions: replicate style/structure from reference exam
+    system_prompt = f"""\
+You are an advanced AI exam generator. 
+Your goals:
+1. Analyze the style, structure, and difficulty from the 'Past Exam Reference.'
+2. Create a new exam with the same number of sections and question types, but different content.
+3. The exam type is {exam_type}, and difficulty is {difficulty}.
+4. Incorporate these improvement suggestions (if any): {combined_improvements}
+5. Provide challenging, well-structured questions that mirror the reference's rigor.
+6. Do NOT reveal chain-of-thought; output only the final exam text.
 """
 
-    # User prompt: incorporate improvements, difficulty, and context
+    # User instructions: ensure advanced coverage, same complexity
     user_prompt = f"""\
-You are tasked with generating a **{difficulty}**-level practice exam for the course: **{course}**.
+--- Past Exam Reference ---
+{exam_text}
 
-**Incorporate the following improvement suggestions (if any)**:
-{combined_improvements}
-
-**Key Instructions**:
-1. The exam should reflect the style and difficulty of the past exam provided in 'Past Exam Reference.'
-2. Use relevant details from 'Relevant Course Chunks' to ensure proper coverage of the course material.
-3. Include Multiple Choice, Short Answer, and Coding/Problem-Solving questions (with Java code blocks if appropriate).
-4. Tailor the difficulty to {difficulty}:
-   - For 'Easy', ensure clarity and fundamental coverage;
-   - For 'Hard', push complexity in problem-solving and advanced concepts.
-5. The ultimate goal: help the student fully prepare to ACE their exam.
-
-Here is the context to inspire your practice exam:
-{context}
-
-Now, please create a single, cohesive practice exam below (without revealing your internal reasoning).
+TASK:
+- Replicate the structure (# of sections, question types, multi-part questions) 
+  from the reference.
+- Create an equally challenging exam for the course '{course}' 
+  at {difficulty} difficulty.
+- Ensure advanced coverage, not trivial short answers. 
+- If the reference includes multi-part questions, do the same.
+- Output only the final exam text with headings, question numbering, etc.
 """
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.7
-        )
-        
-        exam_content = response.choices[0].message.content.strip()
-        last_generated_exam = exam_content
-        return exam_content
-    except Exception as e:
-        logger.error(f"Error generating exam: {str(e)}")
-        return f"Error generating exam: {str(e)}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    exam_output = call_openai_chat(messages, temperature=0.7, max_tokens=1500)
+    last_generated_exam = exam_output
+    return exam_output
 
 # -------------------------------------------------
-# 📌 AI Self-Evaluate Function
+# AI Self-Evaluation for Bad Feedback
 # -------------------------------------------------
-def ai_self_evaluate(last_exam):
-    """
-    Takes the last exam text and returns
-    AI-generated improvements.
-    """
-    improvement_prompt = f"""
-    The user marked the last exam as 'bad'.
-    Here is the exam text:
-    -------------------
-    {last_exam}
-    -------------------
-    Please provide 3 specific improvements to make future exams better:
-    - Focus on question variety
-    - Level of detail in solutions
-    - Formatting or clarity changes
-
-    Format your response as plain text bullet points.
-    """
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are an AI specialized in creating and refining university exams."},
-                {"role": "user", "content": improvement_prompt}
-            ],
-            temperature=0.7
-        )
-        evaluation = response.choices[0].message.content.strip()
-        return evaluation
-    except Exception as e:
-        logger.error(f"Failed to generate improvements: {e}")
-        return "Failed to get improvements."
+def ai_self_evaluate(last_exam_text):
+    system_prompt = "You are an AI specialized in refining university exams."
+    user_prompt = f"""
+The following exam was marked as unsatisfactory. Provide 3 improvements:
+- question variety
+- depth of challenge
+- formatting or clarity
+-------------------
+{last_exam_text}
+-------------------
+"""
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+    return call_openai_chat(messages, temperature=0.7, max_tokens=500)
 
 # -------------------------------------------------
-# 📌 Initialize FAISS Indexes
+# Initialization
 # -------------------------------------------------
 def initialize_exam_materials():
-    """Initialize exam materials and create necessary directories."""
-    try:
-        # Create directories if they don't exist
-        os.makedirs(os.path.join(os.path.dirname(__file__), "static"), exist_ok=True)
-        os.makedirs(os.path.join(os.path.dirname(__file__), "templates"), exist_ok=True)
-        os.makedirs(os.path.join(os.path.dirname(os.path.dirname(__file__)), "exams"), exist_ok=True)
-        
-        # Initialize FAISS indexes and other components
-        global exam_index, practice_exams, course_index, course_chunks, bm25
-        
-        # Path to exams directory
-        exams_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "exams")
-        
-        # Find all PDF files in the directory
-        pdf_files = glob.glob(os.path.join(exams_dir, "*.pdf"))
-        
-        if not pdf_files:
-            logger.warning(f"No PDF files found in {exams_dir}")
-            # Initialize empty indexes
-            exam_index = faiss.IndexFlatL2(1536)
-            practice_exams = []
-            course_index = faiss.IndexFlatL2(1536)
-            course_chunks = []
-            
-            # Create a safe empty BM25 index with at least one token
-            # This prevents division by zero in the BM25Okapi initialization
-            bm25 = BM25Okapi([["placeholder"]])
-            
-            # If no PDFs found, generate a sample exam without context
-            logger.info("No PDFs found. Will generate exams without context.")
-            return
-        
-        # Use the first PDF as the exam reference and the rest as course material
-        exam_pdf = pdf_files[0]
-        logger.info(f"Using {exam_pdf} as exam reference")
-        
-        # Store exam reference
-        exam_index, practice_exams = store_exams_faiss([exam_pdf])
-        
-        # If there are more PDFs, use the second one as course material
-        if len(pdf_files) > 1:
-            course_pdf = pdf_files[1]
-            logger.info(f"Using {course_pdf} as course material")
-            course_index, course_chunks, bm25 = store_course_material_faiss(course_pdf)
-        else:
-            # If only one PDF, use it for both exam and course material
-            logger.info(f"Using {exam_pdf} as both exam reference and course material")
-            course_index, course_chunks, bm25 = store_course_material_faiss(exam_pdf)
-        
-        logger.info("Exam materials initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing exam materials: {str(e)}")
-        raise
+    logger.info("Initializing exam materials (direct REST calls).")
+
+    if not OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY not set!")
+        return False
+
+    # Load feedback and student data
+    load_feedback()
+    load_student_profiles()
+
+    # Build the FAISS index from exam PDFs
+    global exam_index, practice_exams
+    
+    # Create the exams folder if it doesn't exist
+    if not os.path.exists(EXAMS_FOLDER):
+        logger.warning(f"Exam folder not found: {EXAMS_FOLDER}. Creating it.")
+        os.makedirs(EXAMS_FOLDER, exist_ok=True)
+    
+    # Build the FAISS index
+    exam_index, practice_exams = store_exams_faiss(EXAMS_FOLDER)
+    logger.info(f"Exam index built with {len(practice_exams)} chunks.")
+
+    logger.info("Initialization complete.")
+    return True
 
 # -------------------------------------------------
-# 📌 Flask Routes
+# Flask Routes
 # -------------------------------------------------
 @exam_routes.route('/')
 def index():
-    """Render the exam generator page."""
-    return render_template('exam.html')
+    """Renders a page for the exam generator."""
+    return render_template('exams.html')
 
 @exam_routes.route('/generate-exam', methods=['POST'])
-def generate_exam():
-    """Generate a practice exam based on user input."""
+def generate_exam_route():
+    """
+    POST body expects JSON like:
+    {
+      "university": "Brock",
+      "course": "2P03",
+      "exam_type": "final",
+      "difficulty": "hard"
+    }
+    Returns a JSON with the newly generated exam in 'content'.
+    """
     try:
         data = request.json
-        university = data.get('university', '')
-        course = data.get('course', '')
-        difficulty = data.get('difficulty', 'Medium')
-        
+        logger.info(f"Received request to generate exam: {data}")
+
+        course = data.get("course", "").strip()
+        exam_type = data.get("exam_type", "final").strip().lower()
+        difficulty = data.get("difficulty", "medium").strip().lower()
+
         if not course:
-            return jsonify({"error": "Course name is required"}), 400
-            
-        # Generate the exam
-        exam_text = generate_practice_exam(course, difficulty)
-        
-        return jsonify({
-            "exam": exam_text,
-            "university": university,
+            return jsonify({"error": "Course is required."}), 400
+
+        exam_text = generate_practice_exam_realtime(course, exam_type, difficulty)
+        result = {
+            "university": data.get("university", ""),
             "course": course,
-            "difficulty": difficulty
-        })
+            "exam_type": exam_type,
+            "difficulty": difficulty,
+            "generated_at": datetime.datetime.now().isoformat(),
+            "content": exam_text
+        }
+        return jsonify(result), 200
+
     except Exception as e:
-        logger.error(f"Error in generate_exam: {str(e)}")
+        logger.error(f"Error generating exam: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @exam_routes.route('/feedback', methods=['POST'])
 def submit_feedback():
-    """Submit feedback for the last generated exam."""
+    """
+    {
+      "rating": "good" | "bad",
+      "comments": "...",
+      "student_id": "..."
+    }
+    """
     try:
         data = request.json
-        feedback_type = data.get('type', '')
-        student_id = data.get('student_id', 'anonymous')
-        
-        if feedback_type == 'good':
-            feedback_history.append("✅ Exam was well received.")
-            save_feedback()
-            return jsonify({"message": "Positive feedback recorded"})
-        elif feedback_type == 'bad':
-            # Call AI self-evaluation
-            improvement_notes = ai_self_evaluate(last_generated_exam)
-            
-            # Store improvement feedback and save
-            improvement_history.append(improvement_notes)
-            save_feedback()
-            
-            # Track student progress if student_id provided
-            if student_id != 'anonymous':
-                track_student_progress(student_id, "Negative feedback")
-                
-            return jsonify({
-                "message": "Negative feedback recorded",
-                "improvements": improvement_notes
-            })
-        else:
-            return jsonify({"error": "Invalid feedback type"}), 400
+        rating = data.get('rating', '').lower()
+        comments = data.get('comments', '')
+        student_id = data.get('student_id', '')
+
+        if rating not in ['good', 'bad']:
+            return jsonify({"error": "Rating must be 'good' or 'bad'"}), 400
+
+        feedback_entry = {
+            "rating": rating,
+            "comments": comments,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        feedback_history.append(feedback_entry)
+
+        # Track student progress if needed
+        if student_id:
+            track_student_progress(student_id, f"Rating: {rating}, Comments: {comments}")
+
+        # If rating is bad, generate improvements
+        improvements = None
+        if rating == 'bad' and last_generated_exam:
+            improvements = ai_self_evaluate(last_generated_exam)
+            if improvements:
+                improvement_history.append(improvements)
+
+        save_feedback()
+        return jsonify({
+            "success": True,
+            "message": "Feedback submitted successfully",
+            "improvements": improvements if improvements else None
+        })
     except Exception as e:
-        logger.error(f"Error in submit_feedback: {str(e)}")
+        logger.error(f"Error submitting feedback: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # -------------------------------------------------
-# 📌 Initialize on startup
+# App Factory
 # -------------------------------------------------
-# Load feedback and student profiles
-load_feedback()
-load_student_profiles()
+def create_app():
+    app = Flask(__name__, template_folder='templates', static_folder='static')
+    CORS(app)
+    app.register_blueprint(exam_routes)
 
-# Initialize exam materials
-initialize_exam_materials()
+    # Initialize exam materials
+    success = initialize_exam_materials()
+    if not success:
+        logger.warning("Exam materials initialization failed or incomplete.")
 
-# Run the app if executed directly
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 3000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    return app
+
+if __name__ == "__main__":
+    app = create_app()
+    port = int(os.environ.get('PORT', 5000))
+    logger.info(f"Starting server on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=True)

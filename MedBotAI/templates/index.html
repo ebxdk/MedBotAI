@@ -1,862 +1,383 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>MedBot AI - Chat</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    :root {
-      --background: 220 10% 4%;
-      --foreground: 213 31% 91%;
-      --card: 224 71% 4%;
-      --card-foreground: 213 31% 91%;
-      --popover: 224 71% 4%;
-      --popover-foreground: 215 20.2% 65.1%;
-      --primary: 210 40% 50%;
-      --primary-foreground: 222.2 47.4% 11.2%;
-      --secondary: 222.2 47.4% 11.2%;
-      --secondary-foreground: 210 40% 98%;
-      --muted: 223 47% 11%;
-      --muted-foreground: 215 20.2% 65.1%;
-      --accent: 216 34% 17%;
-      --accent-foreground: 210 40% 98%;
-      --destructive: 0 63% 31%;
-      --destructive-foreground: 210 40% 98%;
-      --border: 216 34% 17%;
-      --input: 216 34% 17%;
-      --ring: 224 76% 48%;
-      --radius: 0.5rem;
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root {
-        --background: 0 0% 100%;
-        --foreground: 240 10% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 240 10% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 3.9%;
-        --primary: 221.2 83.2% 53.3%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 240 4.8% 95.9%;
-        --secondary-foreground: 240 5.9% 10%;
-        --muted: 240 4.8% 95.9%;
-        --muted-foreground: 240 3.8% 46.1%;
-        --accent: 240 4.8% 95.9%;
-        --accent-foreground: 240 5.9% 10%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 240 5.9% 90%;
-        --input: 240 5.9% 90%;
-        --ring: 240 5.9% 10%;
-      }
-    }
-
-    * {
-      border-color: hsl(var(--border));
-    }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: hsl(var(--background));
-      color: hsl(var(--foreground));
-      min-height: 100vh;
-    }
-
-    .chat-container {
-      background-color: hsl(var(--card));
-      border-radius: var(--radius);
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-
-    .chat-messages {
-      min-height: 300px;
-      max-height: 500px;
-      overflow-y: auto;
-      border: 1px solid hsl(var(--border));
-      border-radius: var(--radius);
-      background-color: hsl(var(--card));
-    }
-
-    .message {
-      margin: 10px 0;
-      padding: 10px;
-      border-radius: var(--radius);
-    }
-
-    .user-message {
-      background-color: hsl(var(--primary));
-      color: hsl(var(--primary-foreground));
-      margin-left: 20px;
-      border-radius: 15px 15px 0 15px;
-    }
-
-    .bot-message {
-      background-color: hsl(var(--accent));
-      color: hsl(var(--accent-foreground));
-      margin-right: 20px;
-      border-radius: 15px 15px 15px 0;
-    }
-
-    .input-container {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius);
-      font-weight: 500;
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      height: 2.5rem;
-      padding-left: 1rem;
-      padding-right: 1rem;
-      transition-property: color, background-color, border-color;
-      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-      transition-duration: 150ms;
-    }
-
-    .btn-primary {
-      background-color: hsl(var(--primary));
-      color: hsl(var(--primary-foreground));
-    }
-
-    .btn-primary:hover {
-      background-color: hsl(var(--primary) / 0.9);
-    }
-
-    .btn-secondary {
-      background-color: hsl(var(--secondary));
-      color: hsl(var(--secondary-foreground));
-    }
-
-    .btn-secondary:hover {
-      background-color: hsl(var(--secondary) / 0.8);
-    }
-
-    .input {
-      display: flex;
-      height: 2.5rem;
-      width: 100%;
-      border-radius: var(--radius);
-      border: 1px solid hsl(var(--input));
-      background-color: transparent;
-      padding-left: 0.75rem;
-      padding-right: 0.75rem;
-      font-size: 0.875rem;
-      transition-property: border-color, box-shadow;
-      transition-duration: 150ms;
-    }
-
-    .input:focus {
-      outline: none;
-      box-shadow: 0 0 0 2px hsl(var(--ring));
-      border-color: hsl(var(--ring));
-    }
-
-    .typing-indicator {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      padding: 8px 12px;
-    }
-
-    .typing-indicator-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: hsl(var(--primary-foreground) / 0.7);
-      animation: typing 1.4s infinite both;
-    }
-
-    .typing-indicator-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-
-    .typing-indicator-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-
-    @keyframes typing {
-      0%, 100% {
-        transform: translateY(0);
-      }
-      50% {
-        transform: translateY(-5px);
-      }
-    }
-
-    .gradient-bg {
-      background: radial-gradient(circle at top right, hsl(var(--accent)), transparent 70%),
-        radial-gradient(circle at bottom left, hsl(var(--primary) / 0.2), transparent 70%);
-    }
-
-    .navbar {
-      background-color: hsl(var(--card));
-      border-bottom: 1px solid hsl(var(--border));
-    }
-
-    .navbar-brand {
-      font-weight: bold;
-      color: hsl(var(--foreground));
-    }
-
-    .card {
-      border-radius: var(--radius);
-      background-color: hsl(var(--card));
-      color: hsl(var(--card-foreground));
-      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    }
-
-    .nav-tabs {
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-bottom: 2rem;
-      border-radius: var(--radius);
-      background-color: hsl(var(--card));
-      padding: 0.5rem;
-      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    }
-
-    .nav-tab {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1.25rem;
-      border-radius: var(--radius);
-      font-weight: 500;
-      transition: all 0.2s ease;
-    }
-
-    .nav-tab:hover {
-      background-color: hsl(var(--accent));
-      color: hsl(var(--accent-foreground));
-    }
-
-    .nav-tab.active {
-      background-color: hsl(var(--primary));
-      color: hsl(var(--primary-foreground));
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedBot AI - Medical Learning Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body class="gradient-bg">
-  <nav class="navbar p-4">
-    <div class="container mx-auto flex justify-between items-center">
-      <a class="navbar-brand flex items-center gap-2" href="/">
-        <i class="fas fa-robot text-primary"></i>
-        <span class="text-xl">MedBot AI</span>
-      </a>
-    </div>
-  </nav>
-
-  <div class="container mx-auto p-4">
-    <div class="nav-tabs mx-auto max-w-2xl mb-8">
-      <a href="/" class="nav-tab">
-        <i class="fas fa-home"></i>
-        <span>Home</span>
-      </a>
-      <a href="/chat" class="nav-tab active">
-        <i class="fas fa-comments"></i>
-        <span>Chat</span>
-      </a>
-      <a href="/flashcard" class="nav-tab">
-        <i class="fas fa-clone"></i>
-        <span>Flashcards</span>
-      </a>
-      <a href="/exam" class="nav-tab">
-        <i class="fas fa-file-alt"></i>
-        <span>Practice Exams</span>
-      </a>
-      <a href="/calendar" class="nav-tab">
-        <i class="fas fa-calendar-alt"></i>
-        <span>Study Planner</span>
-      </a>
-    </div>
-
-    <div class="chat-container p-6 rounded-lg">
-      <h1 class="text-2xl font-bold mb-6 flex items-center gap-2">
-        <i class="fas fa-comments text-primary"></i>
-        Medical Chatbot
-      </h1>
-      
-      <div class="chat-messages p-4 mb-6" id="chat-messages">
-        <div class="message bot-message">
-          <p>Hello! I'm MedBot AI, your medical education assistant. How can I help you today?</p>
+<body class="dark">
+    <nav class="top-nav">
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="MedBot AI Logo" class="nav-logo">
+            <h1>MedBot AI</h1>
         </div>
-        <!-- Messages will be added here dynamically -->
-      </div>
-      
-      <div id="typing-indicator" class="typing-indicator hidden">
-        <div class="typing-indicator-dot"></div>
-        <div class="typing-indicator-dot"></div>
-        <div class="typing-indicator-dot"></div>
-      </div>
-      
-      <div class="input-container">
-        <div class="flex items-center gap-2 mb-2">
-          <label for="context-toggle" class="flex items-center cursor-pointer">
-            <div class="relative">
-              <input type="checkbox" id="context-toggle" class="sr-only" checked>
-              <div class="block bg-gray-600 w-10 h-6 rounded-full"></div>
-              <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition"></div>
+        <div class="nav-menu">
+            <div class="dropdown">
+                <button class="dropdown-toggle">
+                    <span class="current-tool">AI Chatbot</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"></path>
+        </svg>
+                </button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item active" data-tool="chat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                        AI Chatbot
+                    </button>
+                    <button class="dropdown-item" data-tool="flashcards">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <path d="M12 8v8"></path>
+                            <path d="M8 12h8"></path>
+                        </svg>
+                        AI Flashcards
+                    </button>
+                    <button class="dropdown-item" data-tool="exams">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        </svg>
+                        AI Practice Exams
+                    </button>
+                    <button class="dropdown-item" data-tool="planner">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                        AI Study Planner
+                    </button>
+              </div>
             </div>
-            <div class="ml-3 text-sm font-medium">
-              Use Course Context
-            </div>
-          </label>
-        </div>
-        
-        <div class="flex gap-2">
-          <textarea id="user-input" class="input h-auto min-h-[80px] p-3 w-full" placeholder="Ask me anything about medicine..."></textarea>
-          <div class="flex flex-col gap-2">
-            <button id="send-button" class="btn btn-primary">
-              <i class="fas fa-paper-plane mr-2"></i>Send
+            <button id="theme-toggle" class="theme-toggle">
+                <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
             </button>
-            <button id="stop-button" class="btn btn-secondary hidden">
-              <i class="fas fa-stop mr-2"></i>Stop
-            </button>
-          </div>
         </div>
-        
-        <div class="mt-4">
-          <div class="flex items-center gap-2 mb-2">
-            <label for="file-upload" class="btn btn-secondary cursor-pointer">
-              <i class="fas fa-file-upload mr-2"></i>Upload PDF
-            </label>
-            <input type="file" id="file-upload" accept=".pdf" class="hidden">
-            <span id="file-name" class="text-sm text-muted-foreground"></span>
-          </div>
-          <div id="upload-status" class="mt-2 text-sm"></div>
-        </div>
+    </nav>
+
+    <main class="app-container">
+        <!-- Chat View -->
+        <section id="chat-view" class="tool-view">
+            <div class="chat-side-panel">
+                <div class="side-panel-header">
+                    <button class="new-chat-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        New Chat
+                    </button>
       </div>
+                <div class="chat-history">
+                    <h3>Recent Conversations</h3>
+                    <div class="history-list">
+                        <!-- Chat history items will be added here -->
     </div>
   </div>
+                <div class="side-panel-footer">
+                    <button class="clear-history-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+                        Clear History
+          </button>
+        </div>
+      </div>
+            <div class="chat-main-content">
+                <div class="tool-header">
+                    <h1>AI Chatbot</h1>
+                    <p>Get instant answers to your medical questions</p>
+      </div>
+                <div class="messages">
+                    <div class="welcome-screen">
+                        <h1>What can I help with?</h1>
+                        <p>I'm MedBot AI, your intelligent medical learning assistant. Ask me anything about medicine, create flashcards, or get help with your studies.</p>
+                        <div class="suggestions">
+                            <div class="suggestion-chip">
+                                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                                Explain the cardiac cycle and its key phases
+                            </div>
+                            <div class="suggestion-chip">
+                                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                </svg>
+                                Create flashcards for the nervous system
+                            </div>
+                            <div class="suggestion-chip">
+                                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                Help me understand diabetes pathophysiology
+                            </div>
+                            <div class="suggestion-chip">
+                                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M9 11l3 3L22 4"></path>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                                Quiz me on pharmacology concepts
+                            </div>
+                        </div>
+      </div>
+    </div>
+                <form class="chat-form">
+                    <div class="input-group">
+                        <textarea id="message-input" class="chat-input" placeholder="Ask me anything about medicine..." rows="1" maxlength="4000"></textarea>
+                        <button type="submit" class="send-button" aria-label="Send message">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13"></path>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+  </div>
+                </form>
+                <div id="chat-loading" class="loading-container"></div>
+</div>
+        </section>
 
-  <script>
-    const chatMessages = document.getElementById('chat-messages');
-    const typingIndicator = document.getElementById('typing-indicator');
-    const stopButton = document.getElementById('stop-button');
-    let lastResponse = '';
-    let currentFileId = null;
-    let controller = null;
-
-    // Add event listener for stop button
-    stopButton.addEventListener('click', stopResponseGeneration);
-
-    function appendMessage(text, isUser = false) {
-      const msgDiv = document.createElement('div');
-      msgDiv.classList.add('message', isUser ? 'user-message' : 'bot-message');
-      msgDiv.textContent = text;
-      chatMessages.appendChild(msgDiv);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    function stopResponseGeneration() {
-      if (controller) {
-        controller.abort();
-        controller = null;
-        stopButton.style.display = 'none';
-        typingIndicator.style.display = 'none';
-      }
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('user-input');
-      const message = input.value.trim();
-      if (!message) return;
-
-      // Clean up any previous response generation
-      if (controller) {
-        controller.abort();
-      }
-
-      // Create a new AbortController
-      controller = new AbortController();
-      const signal = controller.signal;
-
-      input.value = '';
-      appendMessage(message, true);
-
-      typingIndicator.style.display = 'block';
-      stopButton.style.display = 'inline-block';
-
-      try {
-        const useRag = document.getElementById('use-rag').checked;
-        
-        const response = await fetch('/chat/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            message,
-            file_id: currentFileId,
-            use_rag: useRag
-          }),
-          signal: signal
-        });
-
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let botMsgDiv = document.createElement('div');
-        botMsgDiv.classList.add('message', 'bot-message');
-        chatMessages.appendChild(botMsgDiv);
-
-        let fullText = '';
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, {stream:true});
-          fullText += chunk;
-          botMsgDiv.textContent = fullText;
-          chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        lastResponse = fullText;
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          appendMessage(`Error: ${error.message}`, false);
-        }
-      } finally {
-        typingIndicator.style.display = 'none';
-        stopButton.style.display = 'none';
-        controller = null;
-      }
-    }
-
-    // Function to speak the last response
-    async function speakLastResponse() {
-      if (!lastResponse) return;
-      
-      // Show loading indicator
-      const notification = document.createElement('div');
-      notification.id = 'speech-notification';
-      notification.style.padding = '10px';
-      notification.style.margin = '10px 0';
-      notification.style.backgroundColor = '#cce5ff';
-      notification.style.border = '1px solid #b8daff';
-      notification.style.borderRadius = '5px';
-      notification.style.color = '#004085';
-      notification.textContent = 'Generating AI voice...';
-      
-      // Add the notification before the input container
-      const inputContainer = document.querySelector('.input-container');
-      inputContainer.parentNode.insertBefore(notification, inputContainer);
-      
-      try {
-        const voice = document.getElementById('voice-select').value;
-        const resp = await fetch('/chat/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: lastResponse, voice })
-        });
-        
-        if (!resp.ok) {
-          throw new Error(`Server responded with ${resp.status}: ${resp.statusText}`);
-        }
-        
-        const data = await resp.json();
-        
-        if (data.audio_url) {
-          // Update notification
-          notification.textContent = 'Playing AI voice...';
-          notification.style.backgroundColor = '#d4edda';
-          notification.style.border = '1px solid #c3e6cb';
-          notification.style.color = '#155724';
-          
-          // Add stop button
-          const stopButton = document.createElement('button');
-          stopButton.textContent = 'Stop';
-          stopButton.style.marginLeft = '10px';
-          stopButton.style.padding = '5px 10px';
-          stopButton.style.backgroundColor = '#dc3545';
-          stopButton.style.color = 'white';
-          stopButton.style.border = 'none';
-          stopButton.style.borderRadius = '3px';
-          stopButton.style.cursor = 'pointer';
-          
-          // Create audio element
-          const audio = new Audio(data.audio_url + '?t=' + new Date().getTime());
-          
-          // Set up stop button
-          stopButton.onclick = () => {
-            audio.pause();
-            audio.currentTime = 0;
-            notification.remove();
-          };
-          notification.appendChild(stopButton);
-          
-          // Set up audio events
-          audio.onerror = (e) => {
-            console.error("Audio error:", e);
-            notification.textContent = 'Error playing audio';
-            notification.style.backgroundColor = '#f8d7da';
-            notification.style.border = '1px solid #f5c6cb';
-            notification.style.color = '#721c24';
-            setTimeout(() => notification.remove(), 3000);
-          };
-          
-          audio.onended = () => {
-            notification.remove();
-          };
-          
-          // Play the audio
-          await audio.play();
-        } else {
-          throw new Error('No audio URL in response');
-        }
-      } catch (error) {
-        console.error('TTS error:', error);
-        
-        // Update notification to show error
-        notification.textContent = `Error: ${error.message}`;
-        notification.style.backgroundColor = '#f8d7da';
-        notification.style.border = '1px solid #f5c6cb';
-        notification.style.color = '#721c24';
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-          if (document.getElementById('speech-notification')) {
-            document.getElementById('speech-notification').remove();
-          }
-        }, 3000);
-      }
-    }
-
-    // Send on Enter (no shift)
-    document.getElementById('user-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
-
-    // Initial greeting
-    appendMessage("Hello! I'm MedBot AI, your medical assistant. How can I help you today?", false);
-
-    // Voice Call Functions
-    let recognition;
-    let audioPlayer;
-    let isListening = false;
-    let isSpeaking = false;
-
-    function startVoiceCall() {
-      // Show the voice call modal
-      document.querySelector('.voice-call-modal').style.display = 'flex';
-      
-      // Initialize speech recognition
-      if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-        recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        
-        recognition.onstart = function() {
-          isListening = true;
-          document.querySelector('.voice-indicator').classList.add('listening');
-          document.querySelector('.voice-status').textContent = 'Listening...';
-        };
-        
-        recognition.onresult = function(event) {
-          const transcript = Array.from(event.results)
-            .map(result => result[0])
-            .map(result => result.transcript)
-            .join('');
-          
-          document.querySelector('.voice-transcript').textContent = transcript;
-          
-          // If this is a final result, send it to the chatbot
-          if (event.results[0].isFinal) {
-            sendVoiceMessage(transcript);
-          }
-        };
-        
-        recognition.onerror = function(event) {
-          console.error('Speech recognition error', event.error);
-          document.querySelector('.voice-status').textContent = 'Error: ' + event.error;
-          stopListening();
-        };
-        
-        recognition.onend = function() {
-          if (isListening) {
-            // If we're still in listening mode but recognition ended, restart it
-            recognition.start();
-          } else {
-            document.querySelector('.voice-indicator').classList.remove('listening');
-            document.querySelector('.voice-status').textContent = 'Waiting for AI response...';
-          }
-        };
-      } else {
-        alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
-        closeVoiceCall();
-      }
-      
-      // Set up event listeners for the buttons
-      document.querySelector('.start-listening-button').addEventListener('click', startListening);
-      document.querySelector('.end-call-button').addEventListener('click', closeVoiceCall);
-    }
-    
-    function startListening() {
-      if (!isListening && !isSpeaking) {
-        try {
-          recognition.start();
-          document.querySelector('.start-listening-button').textContent = 'Stop Listening';
-        } catch (error) {
-          console.error('Error starting recognition:', error);
-        }
-      } else if (isListening) {
-        stopListening();
-      }
-    }
-    
-    function stopListening() {
-      if (isListening) {
-        isListening = false;
-        try {
-          recognition.stop();
-        } catch (error) {
-          console.error('Error stopping recognition:', error);
-        }
-        document.querySelector('.start-listening-button').textContent = 'Start Listening';
-        document.querySelector('.voice-indicator').classList.remove('listening');
-      }
-    }
-    
-    function sendVoiceMessage(message) {
-      stopListening();
-      document.querySelector('.voice-status').textContent = 'Sending message...';
-      
-      // Add the user message to the chat
-      addMessage('user', message);
-      
-      // Send the message to the chatbot
-      fetch('/chat/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ message: message })
-      })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-        
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let botMsgDiv = document.createElement('div');
-        botMsgDiv.classList.add('message', 'bot-message');
-        chatMessages.appendChild(botMsgDiv);
-        
-        let fullText = '';
-        
-        // Function to process the stream
-        function processStream() {
-          return reader.read().then(({ value, done }) => {
-            if (done) {
-              // When stream is complete, update lastResponse and speak
-              lastResponse = fullText;
-              document.querySelector('.voice-status').textContent = 'Response received';
-              speakVoiceResponse(fullText);
-              return;
-            }
+<!-- Flashcards View -->
+        <section id="flashcards-view" class="tool-view" style="display: none;">
+            <div class="tool-header">
+                <h1>AI Flashcards</h1>
+                <p>Create and study custom flashcard sets</p>
+            </div>
             
-            // Decode and append the chunk
-            const chunk = decoder.decode(value, {stream: true});
-            fullText += chunk;
-            botMsgDiv.textContent = fullText;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            
-            // Continue reading
-            return processStream();
-          });
-        }
-        
-        // Start processing the stream
-        return processStream();
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        document.querySelector('.voice-status').textContent = 'Error: Could not get response';
-        appendMessage(`Error: ${error.message}`, false);
-      });
-    }
-    
-    function speakVoiceResponse(text) {
-      document.querySelector('.voice-status').textContent = 'Generating voice...';
-      document.querySelector('.voice-indicator').classList.add('speaking');
-      
-      // Get the selected voice
-      const voiceSelect = document.getElementById('voice-select');
-      const selectedVoice = voiceSelect.value;
-      
-      // Send request to generate speech
-      fetch('/chat/speak', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          text: text,
-          voice: selectedVoice
-        })
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.audio_url) {
-          playAudioResponse(data.audio_url);
-        } else {
-          document.querySelector('.voice-status').textContent = 'Voice unavailable';
-          document.querySelector('.voice-indicator').classList.remove('speaking');
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        document.querySelector('.voice-status').textContent = 'Error generating voice';
-        document.querySelector('.voice-indicator').classList.remove('speaking');
-      });
-    }
-    
-    function playAudioResponse(audioUrl) {
-      isSpeaking = true;
-      document.querySelector('.voice-status').textContent = 'Speaking...';
-      
-      // Create audio element if it doesn't exist
-      if (!audioPlayer) {
-        audioPlayer = new Audio();
-        
-        audioPlayer.onended = function() {
-          audioFinished();
-        };
-        
-        audioPlayer.onerror = function() {
-          console.error('Audio playback error');
-          audioFinished();
-        };
-      }
-      
-      // Set the source and play
-      audioPlayer.src = audioUrl;
-      audioPlayer.play().catch(error => {
-        console.error('Error playing audio:', error);
-        audioFinished();
-      });
-    }
-    
-    function audioFinished() {
-      isSpeaking = false;
-      document.querySelector('.voice-indicator').classList.remove('speaking');
-      document.querySelector('.voice-status').textContent = 'Ready to listen';
-      document.querySelector('.start-listening-button').textContent = 'Start Listening';
-    }
-    
-    function closeVoiceCall() {
-      // Stop any ongoing processes
-      stopListening();
-      
-      if (audioPlayer && !audioPlayer.paused) {
-        audioPlayer.pause();
-      }
-      
-      // Reset the UI
-      document.querySelector('.voice-transcript').textContent = '';
-      document.querySelector('.voice-status').textContent = 'Ready to start';
-      document.querySelector('.voice-indicator').classList.remove('listening', 'speaking');
-      
-      // Hide the modal
-      document.querySelector('.voice-call-modal').style.display = 'none';
-      
-      // Remove event listeners
-      document.querySelector('.start-listening-button').removeEventListener('click', startListening);
-      document.querySelector('.end-call-button').removeEventListener('click', closeVoiceCall);
-    }
+            <!-- Study Mode -->
+            <div class="study-container">
+                <!-- Study Controls -->
+                <div class="study-controls">
+                    <button class="study-mode-btn active" data-mode="cards">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="18" rx="2"></rect>
+                            <line x1="2" y1="9" x2="22" y2="9"></line>
+                        </svg>
+                        Cards
+                    </button>
+                    <button class="study-mode-btn" data-mode="list">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        List
+                    </button>
+                </div>
 
-    // Function to add a message to the chat
-    function addMessage(sender, message) {
-      // Add message to the chat UI
-      if (sender === 'user') {
-        appendMessage(message, true);
-      } else {
-        appendMessage(message, false);
-        lastResponse = message;
-      }
-    }
+                <!-- Flashcard View -->
+                <div class="flashcard-container" id="cards-mode">
+                    <div class="flashcard">
+                        <div class="flashcard-front"></div>
+                        <div class="flashcard-back"></div>
+                    </div>
+                    <div class="flashcard-controls">
+                        <button class="prev-card control-button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M15 18l-6-6 6-6"></path>
+                            </svg>
+                        </button>
+                        <span class="flashcard-counter">0 / 0</span>
+                        <button class="next-card control-button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="card-hint">Click card to flip</div>
+                </div>
 
-    // Initialize the chat
-    document.addEventListener('DOMContentLoaded', function() {
-      // Add initial greeting
-      appendMessage("Hello! I'm MedBot AI, your medical assistant. How can I help you today?", false);
-      
-      // Set up file upload event listeners
-      setupFileUpload();
-    });
-    
-    // File upload handling
-    function setupFileUpload() {
-      const fileInput = document.getElementById('file-upload');
-      const fileNameSpan = document.getElementById('file-name');
-      const removeFileButton = document.getElementById('remove-file');
-      
-      fileInput.addEventListener('change', async function(e) {
-        if (fileInput.files.length > 0) {
-          const file = fileInput.files[0];
-          fileNameSpan.textContent = file.name;
-          removeFileButton.style.display = 'inline-block';
-          
-          // Upload the file
-          const formData = new FormData();
-          formData.append('file', file);
-          
-          try {
-            const response = await fetch('/chat/upload', {
-              method: 'POST',
-              body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-              currentFileId = data.file_id;
-              appendMessage(`File uploaded: ${data.filename}${data.context_added ? ' (Added to context)' : ''}`, false);
-            } else {
-              appendMessage(`Error uploading file: ${data.error}`, false);
-              resetFileUpload();
-            }
-          } catch (error) {
-            console.error('Error uploading file:', error);
-            appendMessage(`Error uploading file: ${error.message}`, false);
-            resetFileUpload();
-          }
-        }
-      });
-      
-      removeFileButton.addEventListener('click', function() {
-        resetFileUpload();
-        appendMessage('File removed from context', false);
-      });
-    }
-    
-    function resetFileUpload() {
-      const fileInput = document.getElementById('file-upload');
-      const fileNameSpan = document.getElementById('file-name');
-      const removeFileButton = document.getElementById('remove-file');
-      
-      fileInput.value = '';
-      fileNameSpan.textContent = '';
-      removeFileButton.style.display = 'none';
-      currentFileId = null;
-    }
-  </script>
+                <!-- List View -->
+                <div class="list-container" id="list-mode" style="display: none;">
+                    <div class="flashcards-list">
+                        <!-- Cards will be listed here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flashcard Generation Form -->
+            <div class="flashcard-form-container">
+                <form class="flashcard-form">
+                    <div class="input-group">
+                        <input type="text" id="flashcard-topic" placeholder="Enter medical topic..." required>
+                        <select id="flashcard-count">
+                            <option value="5">5 cards</option>
+                            <option value="10" selected>10 cards</option>
+                            <option value="15">15 cards</option>
+                            <option value="20">20 cards</option>
+                        </select>
+                        <button type="submit" class="primary-button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            Generate Flashcards
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="flashcards-loading" class="loading-container"></div>
+        </section>
+
+<!-- Practice Exams View -->
+        <section id="exams-view" class="tool-view" style="display: none;">
+    <div class="tool-header">
+                <h1>AI Practice Exams</h1>
+                <p>Test your knowledge with practice questions</p>
+            </div>
+            <div class="exam-content">
+                <form class="exam-form">
+                    <div class="input-group">
+                        <input type="text" id="exam-topic" placeholder="Enter exam topic..." required>
+                        <select id="exam-difficulty">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate" selected>Intermediate</option>
+                  <option value="advanced">Advanced</option>
+              </select>
+                        <select id="question-count">
+                            <option value="5">5 questions</option>
+                            <option value="10" selected>10 questions</option>
+                            <option value="15">15 questions</option>
+                            <option value="20">20 questions</option>
+                        </select>
+                        <button type="submit">Generate Exam</button>
+                    </div>
+                </form>
+                <div class="exam-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <span class="question-counter">Question 0 of 0</span>
+                </div>
+                <div class="question-container"></div>
+                <div class="exam-navigation">
+                    <button class="prev-question">Previous</button>
+                    <button class="next-question">Next</button>
+                    <button class="submit-exam" style="display: none;">Submit Exam</button>
+        </div>
+      </div>
+            <div class="exam-results" style="display: none;">
+                <h2>Exam Results</h2>
+                <div class="results-summary">
+                    <div class="score">
+                        <h3>Score</h3>
+                        <span class="score-value">0%</span>
+        </div>
+                    <div class="correct-answers">
+                        <h3>Correct Answers</h3>
+                        <span class="correct-count">0 of 0</span>
+        </div>
+  </div>
+                <div class="results-breakdown"></div>
+                <button class="try-again">Try Another Exam</button>
+</div>
+            <div id="exam-loading" class="loading-container"></div>
+        </section>
+
+<!-- Study Planner View -->
+        <section id="planner-view" class="tool-view" style="display: none;">
+    <div class="tool-header">
+                <h1>AI Study Planner</h1>
+                <p>Generate personalized study schedules</p>
+            </div>
+            <form class="planner-form">
+                <div class="input-group">
+                    <div class="file-upload">
+                        <input type="file" id="syllabus-upload" accept=".pdf" required>
+                        <label for="syllabus-upload">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+                            Upload Syllabus (PDF)
+                </label>
+                        <span class="selected-file"></span>
+                    </div>
+                    <div class="date-range">
+                        <input type="date" id="start-date" required>
+                        <span>to</span>
+                        <input type="date" id="end-date" required>
+                    </div>
+                    <div class="hours-input">
+                        <label for="study-hours">Daily Study Hours:</label>
+                        <input type="number" id="study-hours" min="1" max="12" value="4" required>
+                    </div>
+                    <button type="submit">Generate Study Plan</button>
+                </div>
+            </form>
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <button class="prev-month">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"></path>
+                        </svg>
+                    </button>
+                    <h2 class="current-month"></h2>
+                    <button class="next-month">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 18l6-6-6-6"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="calendar-grid">
+                    <div class="weekday">Sun</div>
+                    <div class="weekday">Mon</div>
+                    <div class="weekday">Tue</div>
+                    <div class="weekday">Wed</div>
+                    <div class="weekday">Thu</div>
+                    <div class="weekday">Fri</div>
+                    <div class="weekday">Sat</div>
+                    <div class="calendar-dates"></div>
+                </div>
+                <div class="study-topics"></div>
+                <div class="calendar-actions">
+                    <button class="export-calendar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+                            <polyline points="14 2 18 6 14 10"></polyline>
+                            <line x1="18" y1="6" x2="8" y2="6"></line>
+                        </svg>
+                        Export to Google Calendar
+                    </button>
+                    <button class="download-pdf">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download PDF
+                    </button>
+          </div>
+            </div>
+            <div id="planner-loading" class="loading-container"></div>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
-</html>
+</html> 
