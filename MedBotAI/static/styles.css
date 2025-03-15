@@ -988,21 +988,26 @@ body.dark {
 
 /* Welcome Screen */
 .welcome-screen {
-  display: flex;
+    display: flex;
     flex-direction: column;
     align-items: center;
-  justify-content: center;
-    min-height: calc(100vh - 280px);
-    padding: 2rem;
-  text-align: center;
+    justify-content: center;
+    min-height: 40vh;  /* Reduced from 60vh */
+    padding-top: 0;    /* Remove top padding */
+    padding-bottom: 7rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    text-align: center;
     animation: fadeIn 0.5s ease;
     margin: auto;
+    width: 100%;
+    max-width: 800px;
 }
 
 .welcome-screen h1 {
     font-size: 2.5rem;
     font-weight: 600;
-  margin-bottom: 1rem;
+    margin-bottom: 1rem;
     color: var(--dark-text);
 }
 
@@ -1022,38 +1027,39 @@ body.dark {
     color: var(--light-secondary-text);
 }
 
-/* Hide welcome screen when chat is active */
+/* Only hide welcome screen when chat is active and has messages */
 .chat-active .welcome-screen {
-    display: none !important;
+    display: none;
 }
 
 .messages {
-  flex: 1;
-    padding: 1rem 0;
+    flex: 1;
+    padding: 1rem;
     overflow-y: auto;
-  display: flex;
+    display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 .welcome-screen .suggestions {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.875rem;
-    max-width: 600px;
-  width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    max-width: 800px;
 }
 
 .welcome-screen .suggestion-chip {
-    padding: 0.875rem 1rem;
+    padding: 1rem;
     background: var(--dark-card);
     border: 1px solid var(--dark-border);
-    border-radius: 0.75rem;
+    border-radius: 12px;
     color: var(--dark-text);
     font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: left;
-  display: flex;
+    display: flex;
     align-items: flex-start;
     gap: 0.75rem;
 }
@@ -1067,6 +1073,7 @@ body.dark {
 .welcome-screen .suggestion-chip:hover {
     background: var(--dark-hover);
     border-color: var(--dark-accent);
+    transform: translateY(-2px);
 }
 
 .light .welcome-screen .suggestion-chip:hover {
@@ -1079,15 +1086,29 @@ body.dark {
     height: 16px;
     margin-top: 2px;
     flex-shrink: 0;
+    color: var(--dark-accent);
+}
+
+.light .suggestion-chip svg {
+    color: var(--light-accent);
 }
 
 @media (max-width: 640px) {
+    .welcome-screen {
+        padding: 0 1rem 1rem 1rem;  /* Remove top padding, keep other padding */
+        min-height: 40vh;  /* Slightly shorter on mobile */
+    }
+    
     .welcome-screen .suggestions {
         grid-template-columns: 1fr;
     }
     
     .welcome-screen h1 {
-  font-size: 2rem;
+        font-size: 1.75rem;
+    }
+    
+    .welcome-screen p {
+        font-size: 1rem;
     }
 }
 
@@ -3064,99 +3085,4 @@ body.dark {
 
 .modal.show {
     display: flex;
-}
-
-/* Navigation Tools */
-.nav-tools {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-right: 1rem;
-}
-
-.nav-tool-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    background: var(--dark-card);
-    border: 1px solid var(--dark-border);
-    border-radius: 8px;
-    color: var(--dark-text);
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.light .nav-tool-btn {
-    background: var(--light-card);
-    border-color: var(--light-border);
-    color: var(--light-text);
-}
-
-.nav-tool-btn:hover {
-    background: var(--dark-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 6px var(--dark-shadow);
-}
-
-.light .nav-tool-btn:hover {
-    background: var(--light-hover);
-    box-shadow: 0 2px 6px var(--light-shadow);
-}
-
-.nav-tool-btn.active {
-    background: var(--dark-accent);
-    border-color: var(--dark-accent);
-    color: white;
-}
-
-.light .nav-tool-btn.active {
-    background: var(--light-accent);
-    border-color: var(--light-accent);
-}
-
-.nav-tool-btn svg {
-    width: 16px;
-    height: 16px;
-}
-
-/* Mobile responsiveness for nav tools */
-@media (max-width: 768px) {
-    .nav-tools {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: var(--dark-bg);
-        padding: 0.75rem;
-        border-top: 1px solid var(--dark-border);
-        margin: 0;
-        justify-content: space-around;
-        z-index: 1000;
-    }
-
-    .light .nav-tools {
-        background: var(--light-bg);
-        border-color: var(--light-border);
-    }
-
-    .nav-tool-btn {
-        flex-direction: column;
-        padding: 0.5rem;
-        font-size: 0.75rem;
-        text-align: center;
-        flex: 1;
-        max-width: 80px;
-    }
-
-    .nav-tool-btn svg {
-        margin: 0 auto;
-    }
-
-    /* Adjust main container padding for mobile nav */
-    .app-container {
-        padding-bottom: 80px;
-    }
 }

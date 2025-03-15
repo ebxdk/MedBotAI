@@ -111,7 +111,9 @@ function initializeChatInterface() {
         messagesContainer.innerHTML = '';
         
         // Remove chat-active class to show welcome screen
-        chatMainContent?.classList.remove('chat-active');
+        if (chatMainContent) {
+            chatMainContent.classList.remove('chat-active');
+        }
         
         // Create welcome screen
         const welcomeScreen = document.createElement('div');
@@ -125,14 +127,14 @@ function initializeChatInterface() {
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                     </svg>
                     Explain the cardiac cycle and its key phases
-      </div>
+                </div>
                 <div class="suggestion-chip">
                     <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                     </svg>
                     Create flashcards for the nervous system
-        </div>
+                </div>
                 <div class="suggestion-chip">
                     <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -140,17 +142,17 @@ function initializeChatInterface() {
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
                     Help me understand diabetes pathophysiology
-      </div>
+                </div>
                 <div class="suggestion-chip">
                     <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
                         <path d="M9 11l3 3L22 4"></path>
                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                     </svg>
                     Quiz me on pharmacology concepts
-      </div>
-    </div>
-  `;
-  
+                </div>
+            </div>
+        `;
+        
         // Add click handlers for suggestion chips
         welcomeScreen.querySelectorAll('.suggestion-chip').forEach(chip => {
             chip.addEventListener('click', () => {
@@ -294,8 +296,12 @@ function startNewChat() {
     currentChatId = generateChatId();
     messageHistory = [];
     
-    // Clear message container
-    document.querySelector('.messages').innerHTML = '';
+    // Clear message container and show welcome screen
+    const chatMainContent = document.querySelector('.chat-main-content');
+    if (chatMainContent) {
+        chatMainContent.classList.remove('chat-active');
+    }
+    initializeChatInterface();
     
     // Update history panel
     updateChatHistoryPanel();
