@@ -65,14 +65,15 @@ logger.info(f"Available exam routes: {[str(rule) for rule in app.url_map.iter_ru
 def serve_static(path):
     return send_from_directory(app.static_folder, path)
 
+# Serve logo from workspace root
+@app.route('/logo.png')
+def serve_logo():
+    return send_from_directory('/home/runner/workspace/MedBotAI', 'logo.png')
+
 # Serve favicon and logo
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.static_folder, 'dist'), 'favicon.ico')
-
-@app.route('/logo.png')
-def logo():
-    return send_from_directory(os.path.join(app.static_folder, 'dist'), 'logo.png')
 
 # Serve Product Sans fonts
 @app.route('/product-sans/<path:filename>')

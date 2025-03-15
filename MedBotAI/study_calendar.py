@@ -317,35 +317,58 @@ def index():
 @study_calendar_routes.route('/process-syllabus', methods=['POST'])
 def process_syllabus():
     """Process the uploaded syllabus and generate a study plan."""
+    logger.info("=== Starting syllabus processing ===")
+    logger.info(f"Request files: {request.files}")
+    logger.info(f"Request form: {request.form}")
+    logger.info(f"Request headers: {dict(request.headers)}")
+    
     if 'file' not in request.files:
+        logger.error("No file found in request.files")
         return jsonify({"error": "No file uploaded"}), 400
     
     file = request.files['file']
+    logger.info(f"File received: {file.filename}, Content type: {file.content_type}")
+    
     if not file or not file.filename.endswith('.pdf'):
+        logger.error(f"Invalid file: {'No file' if not file else 'Not a PDF'}")
         return jsonify({"error": "Invalid file format. Please upload a PDF."}), 400
 
     # Extract and process text
     full_text = extract_pdf_text(file)
+    logger.info(f"Extracted text length: {len(full_text) if full_text else 0}")
+    
     if not full_text.strip():
+        logger.error("No text could be extracted from the PDF")
         return jsonify({"error": "No text could be extracted from the PDF"}), 400
 
     if not is_likely_syllabus(full_text):
+        logger.warning("Document may not be a syllabus")
         return jsonify({"warning": "This document may not be a syllabus. Do you want to continue?"})
 
     # Process the syllabus
-    filtered_text = filter_text_semantically(full_text)
-    extracted_events = extract_events_with_gpt(filtered_text)
-    topics_list = extract_topics(full_text)
+    try:
+        filtered_text = filter_text_semantically(full_text)
+        extracted_events = extract_events_with_gpt(filtered_text)
+        topics_list = extract_topics(full_text)
 
-    # Store the processed data in session
-    session['extracted_events'] = extracted_events
-    session['topics_list'] = topics_list
+        # Store the processed data in session
+        session['extracted_events'] = extracted_events
+        session['topics_list'] = topics_list
+        
+        logger.info("Successfully processed syllabus")
+        logger.info(f"Extracted events: {extracted_events}")
+        logger.info(f"Topics list: {topics_list}")
 
-    return jsonify({
-        "success": True,
-        "events": extracted_events,
-        "topics": topics_list
-    })
+        return jsonify({
+            "success": True,
+            "events": extracted_events,
+            "topics": topics_list
+        })
+    except Exception as e:
+        logger.error(f"Error processing syllabus: {str(e)}", exc_info=True)
+        return jsonify({"error": f"Failed to process syllabus: {str(e)}"}), 500
+    finally:
+        logger.info("=== Finished syllabus processing ===")
 
 @study_calendar_routes.route('/generate-plan', methods=['POST'])
 def generate_plan():
@@ -498,8 +521,20 @@ def get_calendar_url():
         calendar = service.calendars().get(calendarId='primary').execute()
         calendar_id = calendar['id']
         
-        # Create the embed URL with the user's calendar
-        embed_url = f"https://calendar.google.com/calendar/embed?src={calendar_id}&mode=WEEK"
+        # Create the embed URL with the user's calendar and additional display options
+        embed_url = (
+            f"https://calendar.google.com/calendar/embed"
+            f"?src={calendar_id}"
+            "&mode=MONTH"
+            "&showTitle=0"
+            "&showNav=1"
+            "&showDate=1"
+            "&showPrint=0"
+            "&showTabs=1"
+            "&showCalendars=0"
+            "&showTz=1"
+            "&wkst=1"
+        )
         
         return jsonify({
             'success': True,

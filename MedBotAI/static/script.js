@@ -1,10 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('=== Document Ready - Initializing Application ===');
+    
     // Initialize chat interface first
     initializeChatInterface();
     
     const theme = localStorage.getItem('theme') || 'dark';
     document.body.classList.toggle('dark', theme === 'dark');
     document.body.classList.toggle('light', theme === 'light');
+
+    // Global variables for exam functionality
+    window.examQuestions = [];
+    window.currentQuestionIndex = 0;
+    window.userAnswers = [];
 
     // Dropdown functionality
     const dropdown = document.querySelector('.dropdown');
@@ -81,6 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize with chat view
     switchTool('chat');
+
+    // Process URL parameters
+    handleURLParameters();
+
+    // Initialize study planner if the view exists
+    const plannerView = document.getElementById('planner-view');
+    if (plannerView) {
+        console.log('Planner view found, initializing study planner...');
+        initializeStudyPlanner();
+    }
+    
+    console.log('=== Application Initialization Complete ===');
 });
 
 function initializeChatInterface() {
@@ -164,6 +183,18 @@ function switchTool(toolId) {
         if (view) {
             if (tool === toolId) {
                 view.style.display = tool === 'chat' ? 'grid' : 'block';
+                
+                // If switching to exams view, make sure the layout is properly displayed
+                if (tool === 'exams') {
+                    const examLayout = view.querySelector('.exam-layout');
+                    const examResults = view.querySelector('.exam-results');
+                    
+                    if (examResults.style.display === 'block') {
+                        examLayout.style.display = 'none';
+                    } else {
+                        examLayout.style.display = 'grid';
+                    }
+                }
             } else {
                 view.style.display = 'none';
             }
@@ -182,7 +213,7 @@ function switchTool(toolId) {
         },
         exams: {
             title: 'AI Practice Exams',
-            description: 'Test your knowledge with practice questions'
+            description: 'Test your knowledge with customized practice exams'
         },
         planner: {
             title: 'AI Study Planner',
@@ -198,10 +229,13 @@ function switchTool(toolId) {
     });
     
     // Update tool header content
-    const header = document.querySelector(`#${toolId}-view .tool-header`);
-    if (header && toolInfo[toolId]) {
-        header.querySelector('h1').textContent = toolInfo[toolId].title;
-        header.querySelector('p').textContent = toolInfo[toolId].description;
+    const toolHeader = document.querySelector(`#${toolId}-view .tool-header`);
+    if (toolHeader && toolInfo[toolId]) {
+        const headerTitle = toolHeader.querySelector('h1');
+        const headerDesc = toolHeader.querySelector('p');
+        
+        if (headerTitle) headerTitle.textContent = toolInfo[toolId].title;
+        if (headerDesc) headerDesc.textContent = toolInfo[toolId].description;
     }
 
     // Show/hide chat panel
@@ -235,6 +269,8 @@ function switchTool(toolId) {
 
     if (toolId === 'flashcards') {
         initializeFlashcardsView();
+    } else if (toolId === 'exams') {
+        initializeExamListeners();
     }
 }
 
@@ -393,7 +429,7 @@ function finalizeBotMessage(messageElement, content) {
         const speakerBtn = document.createElement('button');
         speakerBtn.className = 'message-action-btn';
         speakerBtn.setAttribute('data-tooltip', 'Play audio');
-        speakerBtn.innerHTML = `<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+        speakerBtn.innerHTML = `<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
         speakerBtn.onclick = async () => {
             try {
                 const response = await fetch('/chat/speak', {
@@ -901,70 +937,230 @@ let userAnswers = [];
 
 async function generateExam(event) {
     event.preventDefault();
-    const topic = document.getElementById('exam-topic').value;
+    const university = document.getElementById('exam-university').value;
+    const course = document.getElementById('exam-course').value;
+    const examType = document.getElementById('exam-type').value;
     const difficulty = document.getElementById('exam-difficulty').value;
-    const count = document.getElementById('question-count').value;
+    const generateButton = document.querySelector('.exam-form button');
 
-    if (!topic) return;
+    if (!university || !course) {
+        showError('University and course are required');
+        return;
+    }
+
+    // Update button to show generating state
+    const originalButtonText = generateButton.innerHTML;
+    generateButton.disabled = true;
+    generateButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+        </svg>
+        Generating...
+    `;
 
     showLoading('exam-loading');
 
     try {
-        const response = await fetch('/exam/generate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-            body: JSON.stringify({ topic, difficulty, count })
+        // Make sure the exam layout is visible and results are hidden
+        const examLayout = document.querySelector('.exam-layout');
+        const examResults = document.querySelector('.exam-results');
+        const container = document.querySelector('.question-container');
+        
+        if (examLayout) examLayout.style.display = 'grid';
+        if (examResults) examResults.style.display = 'none';
+        if (container) container.innerHTML = ''; // Clear previous content
+
+        const response = await fetch('/exam/generate-exam', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                university, 
+                course, 
+                exam_type: examType, 
+                difficulty
+            })
         });
-    
-    if (!response.ok) {
+
+        if (!response.ok) {
             throw new Error('Failed to generate exam');
         }
 
-        const data = await response.json();
-        examQuestions = data.questions;
-        currentQuestionIndex = 0;
-        userAnswers = new Array(examQuestions.length).fill(null);
-        
+        // Set up event source for streaming
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let examContent = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (!line.trim() || !line.startsWith('data: ')) continue;
+
+                const data = line.slice(6); // Remove 'data: ' prefix
+                if (data === '[DONE]') {
+                    hideLoading('exam-loading');
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.content) {
+                        examContent += parsed.content;
+                        // Update the display in real-time with markdown parsing
+                        container.innerHTML = `<div class="exam-text">${marked.parse(examContent)}</div>`;
+                        container.scrollTop = container.scrollHeight;
+                    }
+                } catch (err) {
+                    console.error('Error parsing SSE data:', err);
+                }
+            }
+        }
+
         hideLoading('exam-loading');
-        updateQuestion();
-        document.querySelector('.submit-exam').style.display = 'block';
         
     } catch (error) {
         hideLoading('exam-loading');
         showError('Failed to generate exam. Please try again.');
+        console.error('Error generating exam:', error);
+    } finally {
+        // Reset button state
+        generateButton.disabled = false;
+        generateButton.innerHTML = originalButtonText;
+    }
+}
+
+// Helper function to parse the exam content into questions
+function parseExamContent(content) {
+    if (!content || typeof content !== 'string') {
+        console.error('Invalid exam content received:', content);
+        return [];
+    }
+
+    const questions = [];
+    
+    try {
+        // Split content into individual questions
+        const questionBlocks = content.split(/Question \d+:/).slice(1); // slice(1) to remove the first empty element
+        
+        questionBlocks.forEach((block, index) => {
+            const lines = block.split('\n').map(line => line.trim()).filter(line => line);
+            
+            // First line is the question text
+            const questionText = lines[0];
+            
+            // Find all option lines (starting with A), B), C), D))
+            const options = lines.filter(line => /^[A-D]\)/.test(line));
+            
+            if (questionText && options.length === 4) {
+                questions.push({
+                    question: questionText,
+                    options: options,
+                    correctAnswer: null
+                });
+            } else {
+                console.warn(`Question ${index + 1} skipped:`, {
+                    text: questionText,
+                    options: options,
+                    allLines: lines
+                });
+            }
+        });
+        
+        console.log('Successfully parsed questions:', questions);
+        return questions;
+        
+    } catch (error) {
+        console.error('Error parsing exam content:', error);
+        return [];
     }
 }
 
 function updateQuestion() {
-    if (examQuestions.length === 0) return;
-
-    const question = examQuestions[currentQuestionIndex];
     const container = document.querySelector('.question-container');
     const counter = document.querySelector('.question-counter');
     const progress = document.querySelector('.progress-fill');
+    
+    if (!container || !counter || !progress) {
+        console.error('Required DOM elements not found');
+        return;
+    }
 
-    container.innerHTML = `
-        <h3>${question.question}</h3>
-        <div class="options">
-            ${question.options.map((option, index) => `
-                <label class="option ${userAnswers[currentQuestionIndex] === index ? 'selected' : ''}">
-                    <input type="radio" name="answer" value="${index}" ${userAnswers[currentQuestionIndex] === index ? 'checked' : ''}>
-                    ${option}
-                </label>
-            `).join('')}
-          </div>
+    if (!examQuestions || examQuestions.length === 0) {
+        console.warn('No exam questions available');
+        container.innerHTML = '<p class="no-questions">No questions available. Please generate an exam first.</p>';
+        counter.textContent = '0 Questions';
+        progress.style.width = '0%';
+        return;
+    }
+
+    // Clear the container
+    container.innerHTML = '';
+    
+    // Display all questions
+    examQuestions.forEach((question, index) => {
+        if (!question.question || !question.options || question.options.length !== 4) {
+            console.warn(`Invalid question format at index ${index}:`, question);
+            return;
+        }
+
+        const questionElement = document.createElement('div');
+        questionElement.className = 'question-item';
+        
+        questionElement.innerHTML = `
+            <h3>Question ${index + 1}</h3>
+            <p>${question.question}</p>
+            <div class="options">
+                ${question.options.map((option, optIndex) => `
+                    <label class="option ${userAnswers[index] === optIndex ? 'selected' : ''}">
+                        <input type="radio" name="answer-${index}" value="${optIndex}" ${userAnswers[index] === optIndex ? 'checked' : ''}>
+                        ${option}
+                    </label>
+                `).join('')}
+            </div>
         `;
         
-    counter.textContent = `Question ${currentQuestionIndex + 1} of ${examQuestions.length}`;
-    progress.style.width = `${((currentQuestionIndex + 1) / examQuestions.length) * 100}%`;
+        container.appendChild(questionElement);
+        
+        // Add a separator between questions
+        if (index < examQuestions.length - 1) {
+            const separator = document.createElement('hr');
+            separator.className = 'question-separator';
+            container.appendChild(separator);
+        }
+    });
+    
+    // Update counter and progress
+    const validQuestions = examQuestions.filter(q => q.question && q.options && q.options.length === 4).length;
+    counter.textContent = `${validQuestions} Questions`;
+    
+    const answeredCount = userAnswers.filter(a => a !== null).length;
+    const progressPercentage = validQuestions > 0 ? (answeredCount / validQuestions) * 100 : 0;
+    progress.style.width = `${progressPercentage}%`;
 
     // Add event listeners to options
     container.querySelectorAll('input[type="radio"]').forEach(input => {
         input.addEventListener('change', () => {
-            userAnswers[currentQuestionIndex] = parseInt(input.value);
-            updateQuestion();
+            const questionIndex = parseInt(input.name.split('-')[1]);
+            userAnswers[questionIndex] = parseInt(input.value);
+            
+            // Update selected class
+            const options = container.querySelectorAll(`input[name="answer-${questionIndex}"]`);
+            options.forEach(opt => {
+                opt.parentElement.classList.remove('selected');
+            });
+            input.parentElement.classList.add('selected');
+            
+            // Update progress bar
+            const newAnsweredCount = userAnswers.filter(a => a !== null).length;
+            const newProgressPercentage = validQuestions > 0 ? (newAnsweredCount / validQuestions) * 100 : 0;
+            progress.style.width = `${newProgressPercentage}%`;
         });
     });
 }
@@ -973,17 +1169,17 @@ async function submitExam() {
     const unanswered = userAnswers.includes(null);
     if (unanswered && !confirm('You have unanswered questions. Submit anyway?')) {
         return;
-      }
+    }
       
     showLoading('exam-loading');
 
     try {
         const response = await fetch('/exam/grade', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
                 answers: userAnswers,
                 questions: examQuestions
             })
@@ -1012,75 +1208,488 @@ async function submitExam() {
             </div>
         `).join('');
 
+        // Hide the exam layout and show the results
+        document.querySelector('.exam-layout').style.display = 'none';
         resultsDiv.style.display = 'block';
-        document.querySelector('.exam-content').style.display = 'none';
         
     } catch (error) {
         hideLoading('exam-loading');
         showError('Failed to grade exam. Please try again.');
+        console.error(error);
+    }
+}
+
+// Initialize exam interface
+function initializeExamListeners() {
+    const examForm = document.querySelector('.exam-form');
+    const submitButton = document.querySelector('.submit-exam');
+    const tryAgainButton = document.querySelector('.try-again');
+    
+    if (examForm) {
+        examForm.addEventListener('submit', generateExam);
+    }
+    
+    if (submitButton) {
+        submitButton.addEventListener('click', submitExam);
+    }
+    
+    if (tryAgainButton) {
+        tryAgainButton.addEventListener('click', () => {
+            // Reset the exam form
+            document.querySelector('.exam-results').style.display = 'none';
+            document.querySelector('.exam-layout').style.display = 'grid';
+            
+            // Clear the form fields
+            document.getElementById('exam-university').value = '';
+            document.getElementById('exam-course').value = '';
+            
+            // Reset the question container
+            document.querySelector('.question-container').innerHTML = '';
+            document.querySelector('.question-counter').textContent = 'Question 0 of 0';
+            document.querySelector('.progress-fill').style.width = '0%';
+            
+            // Hide the submit button
+            document.querySelector('.submit-exam').style.display = 'none';
+        });
     }
 }
 
 // Study Planner Interface
 let calendar = null;
 
-async function generateStudyPlan(event) {
-    event.preventDefault();
-    const fileInput = document.getElementById('syllabus-upload');
-    const startDate = document.getElementById('start-date').value;
-    const endDate = document.getElementById('end-date').value;
-    const studyHours = document.getElementById('study-hours').value;
-
-    if (!fileInput.files[0] || !startDate || !endDate || !studyHours) return;
-
-    const formData = new FormData();
-    formData.append('syllabus', fileInput.files[0]);
-    formData.append('start_date', startDate);
-    formData.append('end_date', endDate);
-    formData.append('study_hours', studyHours);
-
-    showLoading('planner-loading');
-
+async function processSyllabus(event) {
+    console.log('=== Starting syllabus upload process ===');
+    
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log('Event prevented default behavior');
+    }
+    
+    const fileUpload = document.getElementById('syllabus-upload');
+    const uploadButton = document.getElementById('upload-file-btn');
+    const generateButton = document.getElementById('generate-plan-btn');
+    
+    console.log('DOM Elements:', {
+        fileUpload: fileUpload ? 'Found' : 'Not found',
+        uploadButton: uploadButton ? 'Found' : 'Not found',
+        generateButton: generateButton ? 'Found' : 'Not found'
+    });
+    
+    // Check if file is selected
+    if (!fileUpload || !fileUpload.files || !fileUpload.files[0]) {
+        console.error('No file selected:', {
+            fileUpload: !!fileUpload,
+            hasFiles: !!(fileUpload && fileUpload.files),
+            filesLength: fileUpload && fileUpload.files ? fileUpload.files.length : 0
+        });
+        showError('Please select a PDF file first');
+        return;
+    }
+    
+    const file = fileUpload.files[0];
+    console.log('Selected file details:', {
+        name: file.name,
+        type: file.type,
+        size: file.size + ' bytes'
+    });
+    
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+        console.error('Invalid file type:', file.type);
+        showError('Please select a PDF file');
+        return;
+    }
+    
+    // Show loading state on the button
+    const originalButtonText = uploadButton.innerHTML;
+    uploadButton.disabled = true;
+    uploadButton.innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+        </svg>
+        Processing...
+    `;
+    console.log('Upload button state updated to loading');
+    
+    showLoading('calendar-loading');
+    
     try {
-        // First, process the syllabus
-        const processResponse = await fetch('/calendar/process-syllabus', {
-        method: 'POST',
-        body: formData
-        });
-
-        if (!processResponse.ok) {
-            throw new Error('Failed to process syllabus');
-        }
-
-        const processData = await processResponse.json();
-
-        // Then, generate the study plan
-        const planResponse = await fetch('/calendar/generate-plan', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                start_date: startDate,
-                end_date: endDate,
-                study_hours: parseInt(studyHours),
-                extracted_data: processData
-            })
-        });
-
-        if (!planResponse.ok) {
-            throw new Error('Failed to generate study plan');
-        }
-
-        const planData = await planResponse.json();
-        calendar = planData.calendar;
+        // Create form data with the correct field name
+        const formData = new FormData();
+        formData.append('file', file);
         
-        hideLoading('planner-loading');
-        updateCalendar();
+        console.log('Preparing to send file to server:', {
+            endpoint: '/calendar/process-syllabus',
+            fileName: file.name,
+            fileType: file.type,
+            formDataEntries: Array.from(formData.entries()).map(([key, value]) => ({
+                key,
+                type: value instanceof File ? 'File' : typeof value,
+                fileName: value instanceof File ? value.name : null
+            }))
+        });
+        
+        // Process the syllabus
+        console.log('Sending request to server...');
+        const response = await fetch('/calendar/process-syllabus', {
+            method: 'POST',
+            body: formData
+        });
+
+        console.log('Server response received:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            throw new Error(`Failed to process syllabus: ${response.status} ${response.statusText}\n${errorText}`);
+        }
+        
+        // Parse response data
+        const data = await response.json();
+        console.log('Server response data:', data);
+        
+        // Enable the generate button and show success message
+        generateButton.disabled = false;
+        showSuccess('Syllabus uploaded and processed successfully! You can now generate a study plan.');
+        console.log('Upload process completed successfully');
         
     } catch (error) {
-        hideLoading('planner-loading');
-        showError('Failed to generate study plan. Please try again.');
+        console.error('Error during syllabus processing:', {
+            message: error.message,
+            stack: error.stack
+        });
+        showError(error.message || 'Failed to process syllabus. Please try again.');
+        generateButton.disabled = true; // Keep generate button disabled on error
+    } finally {
+        // Reset button state
+        uploadButton.disabled = false;
+        uploadButton.innerHTML = originalButtonText;
+        hideLoading('calendar-loading');
+        console.log('=== Syllabus upload process finished ===');
+    }
+}
+
+async function generateStudyPlan(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    const planDisplay = document.querySelector('.study-plan-display');
+    const generateButton = document.getElementById('generate-plan-btn');
+    const exportButton = document.querySelector('.export-calendar-btn');
+    
+    // Show loading state on the button
+    const originalButtonText = generateButton.innerHTML;
+    generateButton.disabled = true;
+    generateButton.innerHTML = `
+        <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 6v6l4 2"></path>
+        </svg>
+        Generating...
+    `;
+    
+    showLoading('calendar-loading');
+    
+    try {
+        console.log('Generating plan...');
+        
+        // Send request to generate plan - Update the URL to match the correct endpoint
+        const response = await fetch('/calendar/generate-plan', {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to generate plan: ${response.status} ${response.statusText}`);
+        }
+        
+        // Parse response data
+        const data = await response.json();
+        console.log('Plan data received:', JSON.stringify(data, null, 2));
+        
+        if (data.success) {
+            // Enable export button
+            if (exportButton) {
+                exportButton.disabled = false;
+            }
+            
+            // Format and display the generated study plan
+            if (planDisplay) {
+                // Format the plan content for better display
+                let formattedPlan = `
+                    <div class="study-plan-header">
+                        <h2>Generated Study Plan</h2>
+                        <p class="plan-description">Your personalized study schedule based on the syllabus</p>
+                    </div>
+                `;
+                
+                // Add a collapsible debug section
+                formattedPlan += `
+                    <div class="debug-section">
+                    <details>
+                            <summary>Debug Data</summary>
+                            <pre class="debug-data">${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                    </div>
+                `;
+                
+                if (data.plan && Array.isArray(data.plan) && data.plan.length > 0) {
+                    formattedPlan += '<div class="plan-content">';
+                    
+                    // Create a list of events by date
+                    const eventsByDate = {};
+                    data.plan.forEach(event => {
+                        const date = event.date || event.start_date || event.day || new Date().toISOString().split('T')[0];
+                        if (!eventsByDate[date]) {
+                            eventsByDate[date] = [];
+                        }
+                        eventsByDate[date].push(event);
+                    });
+                    
+                    // Format events by date
+                    const sortedDates = Object.keys(eventsByDate).sort();
+                    
+                    if (sortedDates.length === 0) {
+                        formattedPlan += `
+                            <div class="no-events-message">
+                                <p>No scheduled events found in the plan.</p>
+                                <pre class="raw-data">${JSON.stringify(data.plan, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        formattedPlan += '<div class="timeline">';
+                        sortedDates.forEach(date => {
+                            const displayDate = new Date(date);
+                            const dateString = displayDate.toLocaleDateString('en-US', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            });
+                            
+                            formattedPlan += `
+                                <div class="date-group">
+                                    <div class="date-header">
+                                        <h3>${dateString}</h3>
+                                    </div>
+                                    <div class="events-list">
+                            `;
+                            
+                            eventsByDate[date].forEach(event => {
+                                const topic = event.task || event.topic || event.title || event.summary || 
+                                    event.subject || event.name || event.course || 'Untitled Event';
+                                const category = event.category || 'general';
+                                
+                                formattedPlan += `
+                                    <div class="event-item category-${category}">
+                                        <div class="event-content">
+                                            <div class="event-title">${topic}</div>
+                                            ${event.details ? `<div class="event-details">${event.details}</div>` : ''}
+                                            ${event.duration ? `<div class="event-duration">Duration: ${event.duration}</div>` : ''}
+                                            <div class="event-category">${category}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            
+                            formattedPlan += `
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        formattedPlan += '</div>'; // Close timeline
+                    }
+                    
+                    formattedPlan += '</div>'; // Close plan-content
+                }
+                
+                // Update the display
+                planDisplay.innerHTML = formattedPlan;
+                planDisplay.style.display = 'block';
+                
+                // Add CSS to ensure proper scrolling
+                planDisplay.style.maxHeight = '70vh';
+                planDisplay.style.overflowY = 'auto';
+                planDisplay.style.padding = '20px';
+                
+                // Add some basic styles for better readability
+                const style = document.createElement('style');
+                style.textContent = `
+                    .study-plan-header {
+                        margin-bottom: 2em;
+                        padding-bottom: 1em;
+                        border-bottom: 1px solid rgba(255,255,255,0.1);
+                    }
+                    .plan-description {
+                        color: #666;
+                        margin-top: 0.5em;
+                    }
+                    .debug-section {
+                        margin-bottom: 2em;
+                        padding: 1em;
+                        background: rgba(0,0,0,0.2);
+                        border-radius: 8px;
+                    }
+                    .debug-data {
+                        font-size: 0.8em;
+                        overflow-x: auto;
+                    }
+                    .timeline {
+                        position: relative;
+                        padding: 20px 0;
+                    }
+                    .date-group {
+                        margin-bottom: 2em;
+                        padding: 1em;
+                        background: rgba(255,255,255,0.05);
+                        border-radius: 8px;
+                    }
+                    .date-header {
+                        margin-bottom: 1em;
+                        padding-bottom: 0.5em;
+                        border-bottom: 1px solid rgba(255,255,255,0.1);
+                    }
+                    .event-item {
+                        padding: 1em;
+                        margin-bottom: 1em;
+                        background: rgba(255,255,255,0.03);
+                        border-radius: 6px;
+                        border-left: 4px solid;
+                    }
+                    .event-title {
+                        font-weight: bold;
+                        margin-bottom: 0.5em;
+                    }
+                    .event-details {
+                        font-size: 0.9em;
+                        margin: 0.5em 0;
+                        color: #888;
+                    }
+                    .event-category {
+                        font-size: 0.8em;
+                        color: #666;
+                        margin-top: 0.5em;
+                    }
+                    .category-study { border-color: #4CAF50; }
+                    .category-review { border-color: #2196F3; }
+                    .category-assignment { border-color: #FF9800; }
+                    .category-exam { border-color: #f44336; }
+                    .category-general { border-color: #9C27B0; }
+                    .no-events-message {
+                        text-align: center;
+                        padding: 2em;
+                        color: #666;
+                    }
+                    .raw-data {
+                        margin-top: 1em;
+                        padding: 1em;
+                        background: rgba(0,0,0,0.2);
+                        border-radius: 4px;
+                        font-size: 0.8em;
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                // Scroll to the top of the plan display
+                planDisplay.scrollTop = 0;
+            }
+            
+            // Update calendar if events are provided
+            if (data.events) {
+                calendar = data.events;
+        updateCalendar();
+                updateGoogleCalendar(data.events);
+            } else if (data.plan) {
+                // Try to convert plan to calendar format if events not provided
+                try {
+                    const calendarEvents = {};
+                    
+                    if (Array.isArray(data.plan)) {
+                        data.plan.forEach(event => {
+                            const date = event.date || event.start_date || event.day;
+                            if (date) {
+                                // Try to standardize the date format
+                                let standardDate;
+                                try {
+                                    standardDate = new Date(date).toISOString().split('T')[0];
+                                } catch (e) {
+                                    standardDate = date;
+                                }
+                                
+                                if (!calendarEvents[standardDate]) {
+                                    calendarEvents[standardDate] = [];
+                                }
+                                
+                                const topic = event.topic || event.title || event.summary || 
+                                             event.subject || event.name || event.course || 'Study topic';
+                                calendarEvents[standardDate].push(topic);
+                            }
+                        });
+                    } else if (typeof data.plan === 'object') {
+                        // Try to handle if plan is a nested object with dates as keys
+                        Object.keys(data.plan).forEach(dateKey => {
+                            // Try to standardize the date format
+                            let standardDate;
+                            try {
+                                standardDate = new Date(dateKey).toISOString().split('T')[0];
+                            } catch (e) {
+                                standardDate = dateKey;
+                            }
+                            
+                            const events = data.plan[dateKey];
+                            if (!calendarEvents[standardDate]) {
+                                calendarEvents[standardDate] = [];
+                            }
+                            
+                            if (Array.isArray(events)) {
+                                events.forEach(event => {
+                                    const topic = event.topic || event.title || event.summary || 
+                                                 event.subject || event.name || 
+                                                 (typeof event === 'string' ? event : 'Study topic');
+                                    calendarEvents[standardDate].push(topic);
+                                });
+                            } else if (typeof events === 'string') {
+                                calendarEvents[standardDate].push(events);
+                            } else if (typeof events === 'object') {
+                                const topic = events.topic || events.title || events.summary || 'Study topic';
+                                calendarEvents[standardDate].push(topic);
+                            }
+                        });
+                    }
+                    
+                    if (Object.keys(calendarEvents).length > 0) {
+                        calendar = calendarEvents;
+                        updateCalendar();
+                        updateGoogleCalendar(calendarEvents);
+                    }
+                } catch (err) {
+                    console.error('Error converting plan to calendar format:', err);
+                }
+            }
+            
+            showSuccess('Study plan generated successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to generate study plan');
+        }
+    } catch (error) {
+        console.error('Error generating study plan:', error);
+        showError(error.message || 'Failed to generate study plan. Please try again.');
+        if (exportButton) {
+            exportButton.disabled = true; // Keep export button disabled on error
+        }
+    } finally {
+        // Reset button state
+        generateButton.disabled = false;
+        generateButton.innerHTML = originalButtonText;
+        hideLoading('calendar-loading');
     }
 }
 
@@ -1146,6 +1755,19 @@ function updateStudyTopics(date) {
 
 async function exportToCalendar() {
     try {
+        const exportButton = document.querySelector('.export-calendar-btn');
+        const originalButtonText = exportButton.innerHTML;
+        
+        // Update button to show exporting state
+        exportButton.disabled = true;
+        exportButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
+            </svg>
+            <span class="deleting-text">Exporting</span>
+        `;
+
         // First check if user is authenticated
         const authResponse = await fetch('/calendar/check-auth');
         const authData = await authResponse.json();
@@ -1157,10 +1779,8 @@ async function exportToCalendar() {
             
             // Redirect to Google OAuth
             window.location.href = urlData.url;
-      return;
-    }
-    
-        showLoading('planner-loading');
+            return;
+        }
 
         // Export events to Google Calendar
         const response = await fetch('/calendar/add-to-calendar', {
@@ -1175,12 +1795,29 @@ async function exportToCalendar() {
             throw new Error('Failed to export to calendar');
         }
 
-        hideLoading('planner-loading');
         showSuccess('Successfully exported to Google Calendar!');
+        
+        // Refresh the calendar iframe
+        await initializeGoogleCalendar();
 
     } catch (error) {
-        hideLoading('planner-loading');
         showError('Failed to export to calendar. Please try again.');
+        console.error('Error exporting to calendar:', error);
+    } finally {
+        // Reset button state
+        const exportButton = document.querySelector('.export-calendar-btn');
+        exportButton.disabled = false;
+        exportButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
+                <line x1="16" x2="16" y1="2" y2="6"></line>
+                <line x1="8" x2="8" y1="2" y2="6"></line>
+                <line x1="3" x2="21" y1="10" y2="10"></line>
+                <path d="m9 16 3 3 3-3"></path>
+                <path d="M12 12v7"></path>
+            </svg>
+            Export to Google Calendar
+        `;
     }
 }
 
@@ -1273,6 +1910,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Theme toggle
     document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
 
+    // Process URL parameters
+    handleURLParameters();
+
     // Tool navigation
     document.querySelectorAll('.tool-btn').forEach(button => {
         button.addEventListener('click', () => {
@@ -1354,34 +1994,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.submit-exam')?.addEventListener('click', submitExam);
     document.querySelector('.try-again')?.addEventListener('click', () => {
         document.querySelector('.exam-results').style.display = 'none';
-        document.querySelector('.exam-content').style.display = 'block';
+        document.querySelector('.exam-layout').style.display = 'grid';
         document.querySelector('.exam-form').reset();
     });
 
     // Study Planner
-    document.querySelector('.planner-form')?.addEventListener('submit', generateStudyPlan);
-    document.querySelector('.prev-month')?.addEventListener('click', () => {
-        const current = document.querySelector('.current-month').textContent;
-        const [month, year] = current.split(' ');
-        const date = new Date(year, new Date(Date.parse(month + ' 1, ' + year)).getMonth() - 1);
-        updateCalendar(date);
-    });
-    document.querySelector('.next-month')?.addEventListener('click', () => {
-        const current = document.querySelector('.current-month').textContent;
-        const [month, year] = current.split(' ');
-        const date = new Date(year, new Date(Date.parse(month + ' 1, ' + year)).getMonth() + 1);
-        updateCalendar(date);
-    });
-    document.querySelector('.export-calendar')?.addEventListener('click', exportToCalendar);
-    document.querySelector('.download-pdf')?.addEventListener('click', downloadPDF);
+    document.getElementById('planner-form')?.addEventListener('submit', generateStudyPlan);
     
-    // File upload
-    document.getElementById('syllabus-upload')?.addEventListener('change', (event) => {
-        const fileName = event.target.files[0]?.name;
-        if (fileName) {
-            document.querySelector('.selected-file').textContent = fileName;
-        }
-    });
+    // Initialize file upload and other UI components based on current tool
+    initializeChatInterface();
+    if (document.getElementById('flashcards-view')) {
+        initializeFlashcardsView();
+    }
+    if (document.getElementById('exams-view')) {
+        initializeExamListeners();
+    }
+    if (document.getElementById('planner-view')) {
+        initializeStudyPlanner();
+    }
 
     // Initialize chat history panel
     updateChatHistoryPanel();
@@ -1391,4 +2021,419 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize flashcard listeners
     initializeFlashcardListeners();
+});
+
+// Function to show the selected file name
+function showSelectedFile(input) {
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const fileName = document.getElementById('file-name');
+    const fileStatus = document.getElementById('file-status');
+    const fileUploadLabel = document.querySelector('.file-upload-label');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Show the file name
+        fileName.textContent = file.name;
+        fileNameDisplay.style.display = 'block';
+        
+        // Update status text
+        fileStatus.textContent = 'File selected';
+        fileStatus.style.color = '#10b981';
+        
+        // Add class to change the upload label appearance
+        fileUploadLabel.classList.add('has-file');
+    } else {
+        // Reset if no file is selected
+        fileNameDisplay.style.display = 'none';
+        fileStatus.textContent = 'No file selected';
+        fileStatus.style.color = '#666';
+        fileUploadLabel.classList.remove('has-file');
+    }
+}
+
+function initializeFileUpload() {
+    console.log('=== Initializing File Upload System ===');
+    const fileUploadLabel = document.querySelector('.file-upload-label');
+    const fileInput = document.getElementById('syllabus-upload');
+    const uploadButton = document.getElementById('upload-file-btn');
+    
+    console.log('DOM Elements:', {
+        fileUploadLabel: fileUploadLabel ? 'Found' : 'Not found',
+        fileInput: fileInput ? 'Found' : 'Not found',
+        uploadButton: uploadButton ? 'Found' : 'Not found'
+    });
+    
+    if (!fileUploadLabel || !fileInput || !uploadButton) {
+        console.warn('Required elements for file upload not found');
+        return;
+    }
+    
+    // Handle drag and drop
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        console.log(`Adding ${eventName} event listener to file upload label`);
+        fileUploadLabel.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log(`Prevented default behavior for ${e.type} event`);
+    }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileUploadLabel.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileUploadLabel.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight() {
+        console.log('File drag entered/over - highlighting drop zone');
+        fileUploadLabel.classList.add('drag-over');
+    }
+    
+    function unhighlight() {
+        console.log('File drag left/dropped - removing highlight');
+        fileUploadLabel.classList.remove('drag-over');
+    }
+    
+    // Handle file drop
+    fileUploadLabel.addEventListener('drop', handleDrop, false);
+    console.log('Added drop event handler');
+    
+    function handleDrop(e) {
+        console.log('File dropped:', e);
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        console.log('Dropped files:', {
+            count: files.length,
+            fileTypes: Array.from(files).map(f => f.type)
+        });
+        
+        if (files && files.length > 0) {
+            if (files[0].type === 'application/pdf') {
+                console.log('Valid PDF file dropped:', files[0].name);
+                fileInput.files = files;
+                showSelectedFile(fileInput);
+            } else {
+                console.error('Invalid file type dropped:', files[0].type);
+                showError('Please upload a PDF file');
+            }
+        }
+    }
+    
+    // Handle click on the label
+    fileUploadLabel.addEventListener('click', () => {
+        console.log('File upload label clicked - triggering file input click');
+        fileInput.click();
+    });
+    
+    // Handle file selection via input
+    fileInput.addEventListener('change', (e) => {
+        console.log('File input changed:', {
+            hasFiles: e.target.files.length > 0,
+            fileName: e.target.files[0]?.name,
+            fileType: e.target.files[0]?.type
+        });
+        showSelectedFile(fileInput);
+    });
+    
+    // Set up the upload button with a single event listener
+    uploadButton.addEventListener('click', (e) => {
+        console.log('Upload button clicked - initiating processSyllabus');
+        processSyllabus(e);
+    });
+    
+    console.log('=== File Upload System Initialized ===');
+}
+
+// Update showSelectedFile with logging
+function showSelectedFile(input) {
+    console.log('=== Updating File Selection Display ===');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const fileName = document.getElementById('file-name');
+    const fileStatus = document.getElementById('file-status');
+    const fileUploadLabel = document.querySelector('.file-upload-label');
+    
+    console.log('DOM Elements for file display:', {
+        fileNameDisplay: fileNameDisplay ? 'Found' : 'Not found',
+        fileName: fileName ? 'Found' : 'Not found',
+        fileStatus: fileStatus ? 'Found' : 'Not found',
+        fileUploadLabel: fileUploadLabel ? 'Found' : 'Not found'
+    });
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        console.log('Selected file details:', {
+            name: file.name,
+            type: file.type,
+            size: file.size + ' bytes'
+        });
+        
+        // Show the file name
+        fileName.textContent = file.name;
+        fileNameDisplay.style.display = 'block';
+        
+        // Update status text
+        fileStatus.textContent = 'File selected';
+        fileStatus.style.color = '#10b981';
+        
+        // Add class to change the upload label appearance
+        fileUploadLabel.classList.add('has-file');
+        console.log('File display updated for selected file');
+    } else {
+        console.log('No file selected, resetting display');
+        // Reset if no file is selected
+        fileNameDisplay.style.display = 'none';
+        fileStatus.textContent = 'No file selected';
+        fileStatus.style.color = '#666';
+        fileUploadLabel.classList.remove('has-file');
+    }
+    console.log('=== File Selection Display Updated ===');
+}
+
+function initializeStudyPlanner() {
+    console.log('=== Initializing Study Planner ===');
+    
+    // Initialize file upload functionality
+    console.log('Setting up file upload system...');
+    initializeFileUpload();
+    
+    // Reset form and display on first load
+    const fileInput = document.getElementById('syllabus-upload');
+    const generateButton = document.getElementById('generate-plan-btn');
+    const exportButton = document.querySelector('.export-calendar-btn');
+    const clearButton = document.getElementById('clearCalendarBtn');
+    const planDisplay = document.querySelector('.study-plan-display');
+    
+    console.log('Study Planner DOM Elements:', {
+        fileInput: fileInput ? 'Found' : 'Not found',
+        generateButton: generateButton ? 'Found' : 'Not found',
+        exportButton: exportButton ? 'Found' : 'Not found',
+        clearButton: clearButton ? 'Found' : 'Not found',
+        planDisplay: planDisplay ? 'Found' : 'Not found'
+    });
+    
+    if (fileInput) {
+        console.log('Resetting file input');
+        fileInput.value = '';
+        showSelectedFile(fileInput);
+    }
+    
+    // Initialize calendar
+    console.log('Initializing Google Calendar...');
+    initializeGoogleCalendar();
+    
+    // Set up the generate button
+    if (generateButton) {
+        console.log('Setting up generate button');
+        generateButton.disabled = true; // Initially disabled
+        generateButton.addEventListener('click', (e) => {
+            console.log('Generate button clicked');
+            generateStudyPlan(e);
+        });
+    }
+    
+    // Set up export calendar button
+    if (exportButton) {
+        console.log('Setting up export button');
+        exportButton.disabled = true; // Initially disabled
+        exportButton.addEventListener('click', (e) => {
+            console.log('Export button clicked');
+            exportToCalendar(e);
+        });
+    }
+
+    // Set up clear calendar button
+    if (clearButton) {
+        console.log('Setting up clear calendar button');
+        clearButton.addEventListener('click', (e) => {
+            console.log('Clear calendar button clicked');
+            const modal = document.getElementById('dateRangeModal');
+            modal.classList.add('show');
+            
+            // Set default date range (current month)
+            const now = new Date();
+            const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        });
+        
+        // Handle cancel button
+        document.getElementById('cancelClear').addEventListener('click', () => {
+            document.getElementById('dateRangeModal').classList.remove('show');
+        });
+        
+        // Handle confirm button
+        document.getElementById('confirmClear').addEventListener('click', () => {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (startDate && endDate) {
+                if (confirm('Are you sure you want to clear all events between these dates? This cannot be undone.')) {
+                    clearCalendar(startDate, endDate);
+                    document.getElementById('dateRangeModal').classList.remove('show');
+                }
+            } else {
+                showError('Please select both start and end dates');
+            }
+        });
+    }
+    
+    // Clear any previous study plan
+    if (planDisplay) {
+        console.log('Clearing previous study plan display');
+        planDisplay.style.display = 'none';
+        planDisplay.innerHTML = '';
+    }
+    
+    console.log('=== Study Planner Initialization Complete ===');
+}
+
+async function initializeGoogleCalendar() {
+    try {
+        // Get the calendar URL from the server
+        const response = await fetch('/calendar/get-calendar-url');
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to get calendar URL');
+        }
+        
+        // Create an iframe for the Google Calendar embed
+        const calendarContainer = document.getElementById('google-calendar');
+        const iframe = document.createElement('iframe');
+        iframe.src = data.embed_url;
+        iframe.style.border = '0';
+        iframe.width = '100%';
+        iframe.height = '100%';
+        
+        // Clear existing content and add the new iframe
+        calendarContainer.innerHTML = '';
+        calendarContainer.appendChild(iframe);
+
+        // Set up periodic refresh every 5 minutes
+        if (!window.calendarRefreshInterval) {
+            window.calendarRefreshInterval = setInterval(async () => {
+                await updateGoogleCalendar();
+            }, 5 * 60 * 1000); // 5 minutes
+        }
+        
+    } catch (error) {
+        console.error('Error initializing calendar:', error);
+    }
+}
+
+async function updateGoogleCalendar() {
+    try {
+        // Re-initialize the calendar to show new events
+        await initializeGoogleCalendar();
+    } catch (error) {
+        console.error('Error updating calendar:', error);
+    }
+}
+
+// Call initializeGoogleCalendar when the page loads
+document.addEventListener('DOMContentLoaded', initializeGoogleCalendar);
+
+function handleURLParameters() {
+    // Check if there's a file parameter in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileParam = urlParams.get('file');
+    
+    if (fileParam) {
+        // Switch to planner view
+        switchTool('planner');
+        
+        // Clear the URL parameter without refreshing the page
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Show a message about the file parameter
+        showError('Direct file uploads through URL are not supported. Please upload a file using the file picker.');
+    }
+}
+
+async function clearCalendar(fromDate, toDate) {
+    try {
+        const clearButton = document.getElementById('clearCalendarBtn');
+        
+        // Update button to show deleting state
+        clearButton.disabled = true;
+        clearButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            </svg>
+            <span class="deleting-text">Deleting</span>
+        `;
+
+        // First check if user is authenticated
+        const authResponse = await fetch('/calendar/check-auth');
+        const authData = await authResponse.json();
+
+        if (!authData.authenticated) {
+            // Get authorization URL
+            const urlResponse = await fetch('/calendar/get-calendar-url');
+            const urlData = await urlResponse.json();
+            
+            // Redirect to Google OAuth
+            window.location.href = urlData.url;
+            return;
+        }
+
+        // Clear events from Google Calendar
+        const response = await fetch('/calendar/clear-calendar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fromDate, toDate })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to clear calendar');
+        }
+
+        const data = await response.json();
+        showSuccess(data.message || 'Successfully cleared calendar events');
+
+        // Refresh the calendar iframe
+        await initializeGoogleCalendar();
+
+    } catch (error) {
+        showError('Failed to clear calendar. Please try again.');
+        console.error('Error clearing calendar:', error);
+    } finally {
+        // Reset button state
+        const clearButton = document.getElementById('clearCalendarBtn');
+        clearButton.disabled = false;
+        clearButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+            Clear Calendar
+        `;
+    }
+}
+
+// Add event listener for visibility changes to refresh calendar when tab becomes visible
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        updateGoogleCalendar();
+    }
+});
+
+// Refresh calendar when window gains focus
+window.addEventListener('focus', () => {
+    updateGoogleCalendar();
 });

@@ -4,6 +4,7 @@ import json
 import datetime
 import io
 from pathlib import Path
+import time
 
 import requests
 import numpy as np
@@ -14,7 +15,7 @@ import pytesseract
 from PIL import Image
 from rank_bm25 import BM25Okapi
 
-from flask import Flask, request, jsonify, render_template, Blueprint
+from flask import Flask, request, jsonify, render_template, Blueprint, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
@@ -385,27 +386,35 @@ def generate_practice_exam_realtime(course, exam_type, difficulty):
     system_prompt = f"""\
 You are an advanced AI exam generator. 
 Your goals:
-1. Analyze the style, structure, and difficulty from the 'Past Exam Reference.'
-2. Create a new exam with the same number of sections and question types, but different content.
-3. The exam type is {exam_type}, and difficulty is {difficulty}.
-4. Incorporate these improvement suggestions (if any): {combined_improvements}
-5. Provide challenging, well-structured questions that mirror the reference's rigor.
-6. Do NOT reveal chain-of-thought; output only the final exam text.
+1. Create multiple choice questions with exactly 4 options labeled as A), B), C), D)
+2. Each question must start with "Question X:" where X is the question number
+3. The exam type is {exam_type}, and difficulty is {difficulty}
+4. Each question must have:
+   - A clear question text
+   - Four options labeled as A), B), C), D)
+   - Each option on a new line
+5. Format example:
+   Question 1: What is X?
+   A) First option
+   B) Second option
+   C) Third option
+   D) Fourth option
+6. Do NOT include answers or explanations
+7. Do NOT reveal chain-of-thought; output only the final exam text
 """
 
     # User instructions: ensure advanced coverage, same complexity
     user_prompt = f"""\
---- Past Exam Reference ---
-{exam_text}
-
 TASK:
-- Replicate the structure (# of sections, question types, multi-part questions) 
-  from the reference.
-- Create an equally challenging exam for the course '{course}' 
-  at {difficulty} difficulty.
-- Ensure advanced coverage, not trivial short answers. 
-- If the reference includes multi-part questions, do the same.
-- Output only the final exam text with headings, question numbering, etc.
+- Create a challenging exam for the course '{course}' at {difficulty} difficulty
+- Each question must follow the exact format:
+  Question X: [Question text]
+  A) [Option text]
+  B) [Option text]
+  C) [Option text]
+  D) [Option text]
+- Ensure questions are challenging and test deep understanding
+- Output only the final exam text with proper question numbering
 """
 
     messages = [
@@ -476,16 +485,6 @@ def index():
 
 @exam_routes.route('/generate-exam', methods=['POST'])
 def generate_exam_route():
-    """
-    POST body expects JSON like:
-    {
-      "university": "Brock",
-      "course": "2P03",
-      "exam_type": "final",
-      "difficulty": "hard"
-    }
-    Returns a JSON with the newly generated exam in 'content'.
-    """
     try:
         data = request.json
         logger.info(f"Received request to generate exam: {data}")
@@ -497,16 +496,53 @@ def generate_exam_route():
         if not course:
             return jsonify({"error": "Course is required."}), 400
 
-        exam_text = generate_practice_exam_realtime(course, exam_type, difficulty)
-        result = {
-            "university": data.get("university", ""),
-            "course": course,
-            "exam_type": exam_type,
-            "difficulty": difficulty,
-            "generated_at": datetime.datetime.now().isoformat(),
-            "content": exam_text
-        }
-        return jsonify(result), 200
+        def generate():
+            messages = [
+                {"role": "system", "content": f"""You are an advanced AI exam generator.
+Your task is to create a {difficulty} difficulty {exam_type} exam for the course '{course}'.
+Create a variety of question types that test different levels of understanding:
+- Multiple choice questions for testing recall and basic understanding
+- Short answer questions for testing explanation ability
+- Problem-solving questions for testing application of knowledge
+- Essay questions for testing deep understanding and analysis
+- Case study questions for testing practical application
+
+Format the exam clearly with proper numbering and spacing.
+Generate thoughtful, challenging questions that require critical thinking."""},
+                {"role": "user", "content": f"Create a {exam_type} exam for {course} at {difficulty} difficulty level with varied question types."}
+            ]
+
+            url = "https://api.openai.com/v1/chat/completions"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {OPENAI_API_KEY}"
+            }
+            payload = {
+                "model": "gpt-3.5-turbo",
+                "messages": messages,
+                "temperature": 0.7,
+                "stream": True
+            }
+
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            response.raise_for_status()
+
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        if line == 'data: [DONE]':
+                            yield 'data: [DONE]\n\n'
+                            break
+                        try:
+                            json_data = json.loads(line[6:])
+                            content = json_data['choices'][0]['delta'].get('content', '')
+                            if content:
+                                yield f'data: {json.dumps({"content": content})}\n\n'
+                        except json.JSONDecodeError:
+                            continue
+
+        return Response(generate(), mimetype='text/event-stream')
 
     except Exception as e:
         logger.error(f"Error generating exam: {str(e)}", exc_info=True)

@@ -11,48 +11,40 @@
 <body class="dark">
     <nav class="top-nav">
         <div class="nav-brand">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="MedBot AI Logo" class="nav-logo">
+            <img src="/logo.png" alt="MedBot AI Logo" class="nav-logo">
             <h1>MedBot AI</h1>
         </div>
         <div class="nav-menu">
-            <div class="dropdown">
-                <button class="dropdown-toggle">
-                    <span class="current-tool">AI Chatbot</span>
+            <div class="nav-tools">
+                <button class="nav-tool-btn active" data-tool="chat">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6 9l6 6 6-6"></path>
-        </svg>
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    AI Chatbot
                 </button>
-                <div class="dropdown-menu">
-                    <button class="dropdown-item active" data-tool="chat">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-                        AI Chatbot
-                    </button>
-                    <button class="dropdown-item" data-tool="flashcards">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                            <path d="M12 8v8"></path>
-                            <path d="M8 12h8"></path>
-                        </svg>
-                        AI Flashcards
-                    </button>
-                    <button class="dropdown-item" data-tool="exams">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-                        </svg>
-                        AI Practice Exams
-                    </button>
-                    <button class="dropdown-item" data-tool="planner">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-                        AI Study Planner
-                    </button>
-              </div>
+                <button class="nav-tool-btn" data-tool="flashcards">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="18" rx="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                    AI Flashcards
+                </button>
+                <button class="nav-tool-btn" data-tool="exams">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    AI Practice Exams
+                </button>
+                <button class="nav-tool-btn" data-tool="planner">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
+                        <line x1="16" x2="16" y1="2" y2="6"></line>
+                        <line x1="8" x2="8" y1="2" y2="6"></line>
+                        <line x1="3" x2="21" y1="10" y2="10"></line>
+                    </svg>
+                    AI Study Planner
+                </button>
             </div>
             <button id="theme-toggle" class="theme-toggle">
                 <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -245,139 +237,233 @@
 
 <!-- Practice Exams View -->
         <section id="exams-view" class="tool-view" style="display: none;">
-    <div class="tool-header">
+            <div class="tool-header">
                 <h1>AI Practice Exams</h1>
-                <p>Test your knowledge with practice questions</p>
+                <p>Test your knowledge with customized practice exams</p>
             </div>
-            <div class="exam-content">
-                <form class="exam-form">
-                    <div class="input-group">
-                        <input type="text" id="exam-topic" placeholder="Enter exam topic..." required>
-                        <select id="exam-difficulty">
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate" selected>Intermediate</option>
-                  <option value="advanced">Advanced</option>
-              </select>
-                        <select id="question-count">
-                            <option value="5">5 questions</option>
-                            <option value="10" selected>10 questions</option>
-                            <option value="15">15 questions</option>
-                            <option value="20">20 questions</option>
-                        </select>
-                        <button type="submit">Generate Exam</button>
+            <div class="exam-layout">
+                <!-- Left side: Exam Content -->
+                <div class="exam-content">
+                    <div class="exam-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span class="question-counter">Question 0 of 0</span>
                     </div>
-                </form>
-                <div class="exam-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill"></div>
+                    <div class="question-container"></div>
+                    <div class="exam-navigation">
+                        <button class="submit-exam primary-button" style="display: none;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            Submit Exam
+                        </button>
                     </div>
-                    <span class="question-counter">Question 0 of 0</span>
                 </div>
-                <div class="question-container"></div>
-                <div class="exam-navigation">
-                    <button class="prev-question">Previous</button>
-                    <button class="next-question">Next</button>
-                    <button class="submit-exam" style="display: none;">Submit Exam</button>
-        </div>
-      </div>
+                
+                <!-- Right side: Settings -->
+                <div class="exam-settings">
+                    <h3>Exam Settings</h3>
+                    <form class="exam-form">
+                        <div class="settings-group">
+                            <label for="exam-university">University</label>
+                            <input type="text" id="exam-university" placeholder="University name..." required>
+                        </div>
+                        <div class="settings-group">
+                            <label for="exam-course">Course Code</label>
+                            <input type="text" id="exam-course" placeholder="Course code (e.g., 2P03)..." required>
+                        </div>
+                        <div class="settings-group">
+                            <label for="exam-type">Exam Type</label>
+                            <select id="exam-type">
+                                <option value="midterm">Midterm Exam</option>
+                                <option value="final" selected>Final Exam</option>
+                                <option value="practice">Practice Questions</option>
+                            </select>
+                        </div>
+                        <div class="settings-group">
+                            <label for="exam-difficulty">Difficulty</label>
+                            <select id="exam-difficulty">
+                                <option value="easy">Beginner</option>
+                                <option value="medium" selected>Intermediate</option>
+                                <option value="hard">Advanced</option>
+                            </select>
+                        </div>
+                        <div class="settings-group">
+                            <label for="question-count">Number of Questions</label>
+                            <select id="question-count">
+                                <option value="5">5 questions</option>
+                                <option value="10" selected>10 questions</option>
+                                <option value="15">15 questions</option>
+                                <option value="20">20 questions</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="primary-button">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            Generate Exam
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
             <div class="exam-results" style="display: none;">
                 <h2>Exam Results</h2>
                 <div class="results-summary">
                     <div class="score">
                         <h3>Score</h3>
                         <span class="score-value">0%</span>
-        </div>
+                    </div>
                     <div class="correct-answers">
                         <h3>Correct Answers</h3>
                         <span class="correct-count">0 of 0</span>
-        </div>
-  </div>
+                    </div>
+                </div>
                 <div class="results-breakdown"></div>
-                <button class="try-again">Try Another Exam</button>
-</div>
+                <button class="try-again primary-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"></path>
+                        <path d="M1 20v-6h6"></path>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
+                        <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path>
+                    </svg>
+                    Try Another Exam
+                </button>
+            </div>
             <div id="exam-loading" class="loading-container"></div>
         </section>
 
-<!-- Study Planner View -->
+<!-- AI Study Planner View -->
         <section id="planner-view" class="tool-view" style="display: none;">
     <div class="tool-header">
-                <h1>AI Study Planner</h1>
-                <p>Generate personalized study schedules</p>
-            </div>
-            <form class="planner-form">
-                <div class="input-group">
-                    <div class="file-upload">
-                        <input type="file" id="syllabus-upload" accept=".pdf" required>
-                        <label for="syllabus-upload">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-                            Upload Syllabus (PDF)
-                </label>
-                        <span class="selected-file"></span>
+        <h1>AI Study Planner</h1>
+        <p>Generate personalized study schedules</p>
+    </div>
+    
+    <div class="planner-container">
+        <!-- Google Calendar Embed -->
+        <div id="calendar-container">
+            <div id="google-calendar"></div>
+            <div id="calendar-loading" class="loading-container"></div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel">
+            <form id="planner-form" class="planner-form" action="javascript:void(0);" onsubmit="return false;">
+                <div class="file-upload-container">
+                    <div style="display: flex; flex-direction: column; width: 100%;">
+                        <label for="syllabus-upload" class="file-upload-label">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            <span>Drop your syllabus here</span>
+                            <p>or click to browse (PDF)</p>
+                        </label>
+                        
+                        <p id="file-status" style="margin-top: 10px; text-align: center; font-size: 14px; color: #666;">No file selected</p>
                     </div>
-                    <div class="date-range">
-                        <input type="date" id="start-date" required>
-                        <span>to</span>
-                        <input type="date" id="end-date" required>
+                    
+                    <input type="file" id="syllabus-upload" name="file" accept=".pdf" style="display: none;" onchange="showSelectedFile(this)">
+                    
+                    <div id="file-name-display" style="margin-top: 1rem; display: none; padding: 0.75rem 1rem; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; border-radius: 8px; text-align: left;">
+                        <strong>Selected file:</strong> <span id="file-name"></span>
                     </div>
-                    <div class="hours-input">
-                        <label for="study-hours">Daily Study Hours:</label>
-                        <input type="number" id="study-hours" min="1" max="12" value="4" required>
-                    </div>
-                    <button type="submit">Generate Study Plan</button>
                 </div>
-            </form>
-            <div class="calendar-container">
-                <div class="calendar-header">
-                    <button class="prev-month">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 18l-6-6 6-6"></path>
+                
+                <div class="button-container">
+                    <button type="button" id="upload-file-btn" class="primary-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
+                        Upload Syllabus
                     </button>
-                    <h2 class="current-month"></h2>
-                    <button class="next-month">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18l6-6-6-6"></path>
+                    <button type="button" id="generate-plan-btn" class="primary-button" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14M5 12h14"></path>
                         </svg>
+                        Generate Study Plan
                     </button>
-                </div>
-                <div class="calendar-grid">
-                    <div class="weekday">Sun</div>
-                    <div class="weekday">Mon</div>
-                    <div class="weekday">Tue</div>
-                    <div class="weekday">Wed</div>
-                    <div class="weekday">Thu</div>
-                    <div class="weekday">Fri</div>
-                    <div class="weekday">Sat</div>
-                    <div class="calendar-dates"></div>
-                </div>
-                <div class="study-topics"></div>
-                <div class="calendar-actions">
-                    <button class="export-calendar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                            <polyline points="14 2 18 6 14 10"></polyline>
-                            <line x1="18" y1="6" x2="8" y2="6"></line>
+                    <button type="button" class="secondary-button export-calendar-btn" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"></rect>
+                            <line x1="16" x2="16" y1="2" y2="6"></line>
+                            <line x1="8" x2="8" y1="2" y2="6"></line>
+                            <line x1="3" x2="21" y1="10" y2="10"></line>
+                            <path d="m9 16 3 3 3-3"></path>
+                            <path d="M12 12v7"></path>
                         </svg>
                         Export to Google Calendar
                     </button>
-                    <button class="download-pdf">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                    <button type="button" id="clearCalendarBtn" class="secondary-button danger-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h18"></path>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                            <line x1="14" y1="11" x2="14" y2="17"></line>
                         </svg>
-                        Download PDF
+                        Clear Calendar
                     </button>
-          </div>
+                    
+                    <!-- Date Range Modal -->
+                    <div id="dateRangeModal" class="modal" style="display: none;">
+                        <div class="modal-content">
+                            <h3>Select Date Range to Clear</h3>
+                            <div class="date-inputs">
+                                <div class="input-group">
+                                    <label for="startDate">Start Date:</label>
+                                    <input type="date" id="startDate" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="endDate">End Date:</label>
+                                    <input type="date" id="endDate" required>
+                                </div>
+                            </div>
+                            <div class="modal-buttons">
+                                <button type="button" class="secondary-button" id="cancelClear">Cancel</button>
+                                <button type="button" class="danger-button" id="confirmClear">Clear Events</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Add study plan display container -->
+            <div class="study-plan-display" style="margin-top: 2rem; display: none; padding: 1.5rem; background: rgba(255, 255, 255, 0.07); border-radius: 12px; text-align: left; overflow-y: auto; max-height: 65vh; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); font-size: 1rem; line-height: 1.5;">
+                <!-- Generated study plan will be displayed here -->
             </div>
-            <div id="planner-loading" class="loading-container"></div>
-        </section>
+        </div>
+    </div>
+</section>
     </main>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // Prevent form submission redirects
+        document.addEventListener('DOMContentLoaded', function() {
+            const plannerForm = document.getElementById('planner-form');
+            if (plannerForm) {
+                plannerForm.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    // The generateStudyPlan function will be called by the event listener in script.js
+                });
+            }
+            
+            // Handle direct URL navigation with query parameters
+            if (window.location.search.includes('file=')) {
+                // Switch to the planner view
+                const plannerViewButton = document.querySelector('.dropdown-item[data-tool="planner"]');
+                if (plannerViewButton) {
+                    plannerViewButton.click();
+                }
+            }
+        });
+    </script>
 </body>
 </html> 
