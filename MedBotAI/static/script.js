@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize chat interface first
     initializeChatInterface();
     
+    // Initialize scroll functionality
+    initializeScrollFunctionality();
+    
     const theme = localStorage.getItem('theme') || 'dark';
     document.body.classList.toggle('dark', theme === 'dark');
     document.body.classList.toggle('light', theme === 'light');
@@ -119,8 +122,14 @@ function initializeChatInterface() {
         const welcomeScreen = document.createElement('div');
         welcomeScreen.className = 'welcome-screen';
         welcomeScreen.innerHTML = `
-            <h1>How can I help you?</h1>
-            <p>Ask me anything about medicine, and I'll help you learn and understand.</p>
+            <div class="typewriter-container">
+                <div class="line">
+                    <h1><span>How can I help you?</span></h1>
+                </div>
+                <div class="line">
+                    <div class="typing-text"><span>Ask me anything about medicine, and I'll help you learn and understand.</span></div>
+                </div>
+            </div>
             <div class="suggestions">
                 <div class="suggestion-chip">
                     <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
@@ -303,23 +312,42 @@ function startNewChat() {
     }
     initializeChatInterface();
     
+    // Update history panel with temporary "New Chat" title
+    const tempChatData = {
+        id: currentChatId,
+        title: 'New Chat',
+        messages: [],
+        date: new Date().toISOString(),
+        isTemp: true // Flag to indicate this is a temporary title
+    };
+    
+    // Add to beginning of chat history
+    chatHistory.unshift(tempChatData);
+    
     // Update history panel
     updateChatHistoryPanel();
 }
 
-// Save current chat to history
+// Save current chat to history with dynamic title
 function saveCurrentChat() {
     if (currentChatId && messageHistory.length > 0) {
-        // Get first user message as title
-        const firstUserMessage = messageHistory.find(msg => msg.role === 'user');
-        const title = firstUserMessage ? 
-            (firstUserMessage.content.length > 30 ? 
-                firstUserMessage.content.substring(0, 30) + '...' : 
-                firstUserMessage.content) : 
-            'New Chat';
-        
-        // Create or update chat in history
+        // Find existing chat
         const existingChatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
+        
+        // Generate title from first user message or first bot response
+        let title = 'New Chat';
+        const firstUserMessage = messageHistory.find(msg => msg.type === 'user');
+        const firstBotMessage = messageHistory.find(msg => msg.type === 'assistant');
+        
+        if (firstUserMessage) {
+            // Use the first user message to generate a concise title
+            title = generateChatTitle(firstUserMessage.content);
+        } else if (firstBotMessage) {
+            // Fallback to bot message if no user message
+            title = generateChatTitle(firstBotMessage.content);
+        }
+        
+        // Create or update chat data
         const chatData = {
             id: currentChatId,
             title: title,
@@ -328,7 +356,14 @@ function saveCurrentChat() {
         };
         
         if (existingChatIndex >= 0) {
-            chatHistory[existingChatIndex] = chatData;
+            // Only update title if it was temporary
+            if (chatHistory[existingChatIndex].isTemp) {
+                chatHistory[existingChatIndex] = chatData;
+            } else {
+                // Keep existing title if not temporary
+                chatData.title = chatHistory[existingChatIndex].title;
+                chatHistory[existingChatIndex] = chatData;
+            }
         } else {
             chatHistory.unshift(chatData);
         }
@@ -336,6 +371,28 @@ function saveCurrentChat() {
         // Save to localStorage
         localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
     }
+}
+
+// Helper function to generate a concise chat title
+function generateChatTitle(content) {
+    // Remove markdown formatting
+    content = content.replace(/[#*`_~]/g, '');
+    
+    // Split into sentences and take the first one
+    let sentences = content.split(/[.!?]+/);
+    let firstSentence = sentences[0].trim();
+    
+    // If the first sentence is too long, take the first few words
+    if (firstSentence.length > 40) {
+        let words = firstSentence.split(' ');
+        firstSentence = words.slice(0, 5).join(' ') + '...';
+    } else if (firstSentence.length < 10 && sentences.length > 1) {
+        // If first sentence is too short, include part of the second sentence
+        firstSentence = (sentences[0] + ' ' + sentences[1]).slice(0, 40).trim() + '...';
+    }
+    
+    // Capitalize first letter
+    return firstSentence.charAt(0).toUpperCase() + firstSentence.slice(1);
 }
 
 // Load chat from history
@@ -361,34 +418,50 @@ function loadChat(chatId) {
     }
 }
 
-// Update the displayMessage function to handle streaming
+// Update the displayMessage function to use auto-scroll
 function displayMessage(content, isUser = false) {
     const messagesContainer = document.querySelector('.messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+    const chatMainContent = document.querySelector('.chat-main-content');
     
-    // For bot messages, parse markdown
-    if (!isUser) {
-        messageDiv.innerHTML = marked.parse(content);
-    } else {
-        messageDiv.textContent = content;
+    if (!messagesContainer || !chatMainContent) return null;
+    
+    // Remove welcome screen if present
+    const welcomeScreen = messagesContainer.querySelector('.welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.remove();
+        chatMainContent.classList.add('chat-active');
     }
     
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    return messageDiv;
+    const messageElement = document.createElement('div');
+    messageElement.className = isUser ? 'message user user-message' : 'message bot bot-message';
+    messageElement.innerHTML = `
+        <div class="message-content">
+            ${isUser ? marked.parse(content) : ''}
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageElement);
+    scrollToBottom();
+    
+    return messageElement;
+}
+
+// Update the updateStreamingMessage function to use auto-scroll
+function updateStreamingMessage(messageElement, content) {
+    if (messageElement) {
+        messageElement.querySelector('.message-content').innerHTML = marked.parse(content);
+        scrollToBottom();
+    }
 }
 
 // Function to update streaming message content
-function updateStreamingMessage(messageElement, content) {
-    if (messageElement) {
-        messageElement.innerHTML = marked.parse(content);
-    }
-}
-
-// Function to finalize bot message with action buttons
 function finalizeBotMessage(messageElement, content) {
     if (messageElement) {
+        // Ensure the message has the proper classes
+        if (!messageElement.classList.contains('bot-message')) {
+            messageElement.classList.add('bot-message');
+        }
+        
         // Update final content
         messageElement.innerHTML = marked.parse(content);
         
@@ -508,6 +581,12 @@ async function sendChatMessage() {
         timestamp: new Date().toISOString()
     });
     
+    // If this is the first message, update the chat title
+    if (messageHistory.length === 1) {
+        saveCurrentChat(); // This will generate and save the title
+        updateChatHistoryPanel(); // Update the display
+    }
+    
     try {
         // Show typing indicator
         showTypingIndicator();
@@ -623,12 +702,12 @@ function updateChatHistoryPanel() {
             <div class="history-item-content">
                 <div class="history-item-title">${chat.title}</div>
                 <div class="history-item-date">${new Date(chat.date).toLocaleDateString()}</div>
-          </div>
-            <button class="delete-chat-btn" data-chat-id="${chat.id}">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            </div>
+            <button class="delete-chat-btn" data-chat-id="${chat.id}" aria-label="Delete chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
                     <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
+                </svg>
             </button>
         `;
         
@@ -642,15 +721,15 @@ function updateChatHistoryPanel() {
         historyList.appendChild(historyItem);
     });
     
-    // Add delete handlers
+    // Add delete handlers - now without confirmation
     document.querySelectorAll('.delete-chat-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const chatId = btn.dataset.chatId;
             deleteChat(chatId);
+        });
     });
-  });
-  
+    
     // Show/hide empty state
     const emptyState = historyContainer.querySelector('.empty-history');
     if (emptyState) {
@@ -1275,6 +1354,7 @@ async function processSyllabus(event) {
     const fileUpload = document.getElementById('syllabus-upload');
     const uploadButton = document.getElementById('upload-file-btn');
     const generateButton = document.getElementById('generate-plan-btn');
+    const exportButton = document.querySelector('.export-calendar-btn');
     
     console.log('DOM Elements:', {
         fileUpload: fileUpload ? 'Found' : 'Not found',
@@ -1290,6 +1370,8 @@ async function processSyllabus(event) {
             filesLength: fileUpload && fileUpload.files ? fileUpload.files.length : 0
         });
         showError('Please select a PDF file first');
+        generateButton.disabled = true;
+        exportButton.disabled = true;
         return;
     }
     
@@ -1304,12 +1386,17 @@ async function processSyllabus(event) {
     if (file.type !== 'application/pdf') {
         console.error('Invalid file type:', file.type);
         showError('Please select a PDF file');
+        generateButton.disabled = true;
+        exportButton.disabled = true;
         return;
     }
     
     // Show loading state on the button
     const originalButtonText = uploadButton.innerHTML;
     uploadButton.disabled = true;
+    generateButton.disabled = true;
+    exportButton.disabled = true;
+    
     uploadButton.innerHTML = `
         <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -1317,7 +1404,6 @@ async function processSyllabus(event) {
         </svg>
         Processing...
     `;
-    console.log('Upload button state updated to loading');
     
     showLoading('calendar-loading');
     
@@ -1373,6 +1459,7 @@ async function processSyllabus(event) {
         });
         showError(error.message || 'Failed to process syllabus. Please try again.');
         generateButton.disabled = true; // Keep generate button disabled on error
+        exportButton.disabled = true;
     } finally {
         // Reset button state
         uploadButton.disabled = false;
@@ -1388,13 +1475,14 @@ async function generateStudyPlan(event) {
         event.stopPropagation();
     }
     
-    const planDisplay = document.querySelector('.study-plan-display');
     const generateButton = document.getElementById('generate-plan-btn');
     const exportButton = document.querySelector('.export-calendar-btn');
     
     // Show loading state on the button
     const originalButtonText = generateButton.innerHTML;
     generateButton.disabled = true;
+    exportButton.disabled = true;
+    
     generateButton.innerHTML = `
         <svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -1408,7 +1496,7 @@ async function generateStudyPlan(event) {
     try {
         console.log('Generating plan...');
         
-        // Send request to generate plan - Update the URL to match the correct endpoint
+        // Send request to generate plan
         const response = await fetch('/calendar/generate-plan', {
             method: 'POST'
         });
@@ -1423,195 +1511,12 @@ async function generateStudyPlan(event) {
         
         if (data.success) {
             // Enable export button
-            if (exportButton) {
-                exportButton.disabled = false;
-            }
-            
-            // Format and display the generated study plan
-            if (planDisplay) {
-                // Format the plan content for better display
-                let formattedPlan = `
-                    <div class="study-plan-header">
-                        <h2>Generated Study Plan</h2>
-                        <p class="plan-description">Your personalized study schedule based on the syllabus</p>
-                    </div>
-                `;
-                
-                // Add a collapsible debug section
-                formattedPlan += `
-                    <div class="debug-section">
-                    <details>
-                            <summary>Debug Data</summary>
-                            <pre class="debug-data">${JSON.stringify(data, null, 2)}</pre>
-                    </details>
-                    </div>
-                `;
-                
-                if (data.plan && Array.isArray(data.plan) && data.plan.length > 0) {
-                    formattedPlan += '<div class="plan-content">';
-                    
-                    // Create a list of events by date
-                    const eventsByDate = {};
-                    data.plan.forEach(event => {
-                        const date = event.date || event.start_date || event.day || new Date().toISOString().split('T')[0];
-                        if (!eventsByDate[date]) {
-                            eventsByDate[date] = [];
-                        }
-                        eventsByDate[date].push(event);
-                    });
-                    
-                    // Format events by date
-                    const sortedDates = Object.keys(eventsByDate).sort();
-                    
-                    if (sortedDates.length === 0) {
-                        formattedPlan += `
-                            <div class="no-events-message">
-                                <p>No scheduled events found in the plan.</p>
-                                <pre class="raw-data">${JSON.stringify(data.plan, null, 2)}</pre>
-                            </div>
-                        `;
-                    } else {
-                        formattedPlan += '<div class="timeline">';
-                        sortedDates.forEach(date => {
-                            const displayDate = new Date(date);
-                            const dateString = displayDate.toLocaleDateString('en-US', { 
-                                weekday: 'long', 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                            });
-                            
-                            formattedPlan += `
-                                <div class="date-group">
-                                    <div class="date-header">
-                                        <h3>${dateString}</h3>
-                                    </div>
-                                    <div class="events-list">
-                            `;
-                            
-                            eventsByDate[date].forEach(event => {
-                                const topic = event.task || event.topic || event.title || event.summary || 
-                                    event.subject || event.name || event.course || 'Untitled Event';
-                                const category = event.category || 'general';
-                                
-                                formattedPlan += `
-                                    <div class="event-item category-${category}">
-                                        <div class="event-content">
-                                            <div class="event-title">${topic}</div>
-                                            ${event.details ? `<div class="event-details">${event.details}</div>` : ''}
-                                            ${event.duration ? `<div class="event-duration">Duration: ${event.duration}</div>` : ''}
-                                            <div class="event-category">${category}</div>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            
-                            formattedPlan += `
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        formattedPlan += '</div>'; // Close timeline
-                    }
-                    
-                    formattedPlan += '</div>'; // Close plan-content
-                }
-                
-                // Update the display
-                planDisplay.innerHTML = formattedPlan;
-                planDisplay.style.display = 'block';
-                
-                // Add CSS to ensure proper scrolling
-                planDisplay.style.maxHeight = '70vh';
-                planDisplay.style.overflowY = 'auto';
-                planDisplay.style.padding = '20px';
-                
-                // Add some basic styles for better readability
-                const style = document.createElement('style');
-                style.textContent = `
-                    .study-plan-header {
-                        margin-bottom: 2em;
-                        padding-bottom: 1em;
-                        border-bottom: 1px solid rgba(255,255,255,0.1);
-                    }
-                    .plan-description {
-                        color: #666;
-                        margin-top: 0.5em;
-                    }
-                    .debug-section {
-                        margin-bottom: 2em;
-                        padding: 1em;
-                        background: rgba(0,0,0,0.2);
-                        border-radius: 8px;
-                    }
-                    .debug-data {
-                        font-size: 0.8em;
-                        overflow-x: auto;
-                    }
-                    .timeline {
-                        position: relative;
-                        padding: 20px 0;
-                    }
-                    .date-group {
-                        margin-bottom: 2em;
-                        padding: 1em;
-                        background: rgba(255,255,255,0.05);
-                        border-radius: 8px;
-                    }
-                    .date-header {
-                        margin-bottom: 1em;
-                        padding-bottom: 0.5em;
-                        border-bottom: 1px solid rgba(255,255,255,0.1);
-                    }
-                    .event-item {
-                        padding: 1em;
-                        margin-bottom: 1em;
-                        background: rgba(255,255,255,0.03);
-                        border-radius: 6px;
-                        border-left: 4px solid;
-                    }
-                    .event-title {
-                        font-weight: bold;
-                        margin-bottom: 0.5em;
-                    }
-                    .event-details {
-                        font-size: 0.9em;
-                        margin: 0.5em 0;
-                        color: #888;
-                    }
-                    .event-category {
-                        font-size: 0.8em;
-                        color: #666;
-                        margin-top: 0.5em;
-                    }
-                    .category-study { border-color: #4CAF50; }
-                    .category-review { border-color: #2196F3; }
-                    .category-assignment { border-color: #FF9800; }
-                    .category-exam { border-color: #f44336; }
-                    .category-general { border-color: #9C27B0; }
-                    .no-events-message {
-                        text-align: center;
-                        padding: 2em;
-                        color: #666;
-                    }
-                    .raw-data {
-                        margin-top: 1em;
-                        padding: 1em;
-                        background: rgba(0,0,0,0.2);
-                        border-radius: 4px;
-                        font-size: 0.8em;
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                // Scroll to the top of the plan display
-                planDisplay.scrollTop = 0;
-            }
+            exportButton.disabled = false;
             
             // Update calendar if events are provided
             if (data.events) {
                 calendar = data.events;
-        updateCalendar();
+                updateCalendar();
                 updateGoogleCalendar(data.events);
             } else if (data.plan) {
                 // Try to convert plan to calendar format if events not provided
@@ -1634,39 +1539,11 @@ async function generateStudyPlan(event) {
                                     calendarEvents[standardDate] = [];
                                 }
                                 
-                                const topic = event.topic || event.title || event.summary || 
-                                             event.subject || event.name || event.course || 'Study topic';
-                                calendarEvents[standardDate].push(topic);
-                            }
-                        });
-                    } else if (typeof data.plan === 'object') {
-                        // Try to handle if plan is a nested object with dates as keys
-                        Object.keys(data.plan).forEach(dateKey => {
-                            // Try to standardize the date format
-                            let standardDate;
-                            try {
-                                standardDate = new Date(dateKey).toISOString().split('T')[0];
-                            } catch (e) {
-                                standardDate = dateKey;
-                            }
-                            
-                            const events = data.plan[dateKey];
-                            if (!calendarEvents[standardDate]) {
-                                calendarEvents[standardDate] = [];
-                            }
-                            
-                            if (Array.isArray(events)) {
-                                events.forEach(event => {
-                                    const topic = event.topic || event.title || event.summary || 
-                                                 event.subject || event.name || 
-                                                 (typeof event === 'string' ? event : 'Study topic');
-                                    calendarEvents[standardDate].push(topic);
+                                // Store the complete event information, not just the topic
+                                calendarEvents[standardDate].push({
+                                    task: event.task || event.title || event.summary || event.subject || event.name || 'Study topic',
+                                    category: event.category || 'Study'
                                 });
-                            } else if (typeof events === 'string') {
-                                calendarEvents[standardDate].push(events);
-                            } else if (typeof events === 'object') {
-                                const topic = events.topic || events.title || events.summary || 'Study topic';
-                                calendarEvents[standardDate].push(topic);
                             }
                         });
                     }
@@ -1688,9 +1565,7 @@ async function generateStudyPlan(event) {
     } catch (error) {
         console.error('Error generating study plan:', error);
         showError(error.message || 'Failed to generate study plan. Please try again.');
-        if (exportButton) {
-            exportButton.disabled = true; // Keep export button disabled on error
-        }
+        exportButton.disabled = true; // Keep export button disabled on error
     } finally {
         // Reset button state
         generateButton.disabled = false;
@@ -1706,10 +1581,15 @@ function updateCalendar() {
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
 
-    document.querySelector('.current-month').textContent = 
-        new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+    // Check if element exists before trying to set its content
+    const currentMonthElement = document.querySelector('.current-month');
+    if (currentMonthElement) {
+        currentMonthElement.textContent = new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+    }
 
     const datesGrid = document.querySelector('.calendar-dates');
+    if (!datesGrid) return; // Exit if calendar grid doesn't exist
+    
     datesGrid.innerHTML = '';
 
     // Add empty cells for days before the 1st
@@ -1728,7 +1608,20 @@ function updateCalendar() {
 
         if (calendar[dateString]) {
             dayDiv.classList.add('has-topics');
-            dayDiv.setAttribute('data-topics', calendar[dateString].join('\n'));
+            
+            // Format topics for the tooltip
+            let topicsText;
+            if (calendar[dateString][0] && typeof calendar[dateString][0] === 'object') {
+                // New format: array of objects with task and category
+                topicsText = calendar[dateString].map(item => 
+                    `${item.task} (${item.category})`
+                ).join('\n');
+            } else {
+                // Old format: array of strings
+                topicsText = calendar[dateString].join('\n');
+            }
+            
+            dayDiv.setAttribute('data-topics', topicsText);
             
             // Add click event to show topics
             dayDiv.addEventListener('click', () => {
@@ -1748,15 +1641,41 @@ function updateStudyTopics(date) {
     const topics = calendar[dateString] || [];
     
     const topicsDiv = document.querySelector('.study-topics');
-    topicsDiv.innerHTML = topics.length ? topics.map(topic => `
-        <div class="study-topic">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 6v6l4 2"></path>
-            </svg>
-            ${topic}
-        </div>
-    `).join('') : '<p>No topics scheduled for this date</p>';
+    if (!topicsDiv) return; // Exit if topics container doesn't exist
+    
+    if (topics.length) {
+        let topicsHTML = '';
+        
+        // Check the format of the topics array
+        if (typeof topics[0] === 'object') {
+            // New format: array of objects with task and category
+            topicsHTML = topics.map(item => `
+                <div class="study-topic">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v6l4 2"></path>
+                    </svg>
+                    <span class="task">${item.task}</span>
+                    <span class="category">(${item.category})</span>
+                </div>
+            `).join('');
+        } else {
+            // Old format: array of strings
+            topicsHTML = topics.map(topic => `
+                <div class="study-topic">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v6l4 2"></path>
+                    </svg>
+                    ${topic}
+                </div>
+            `).join('');
+        }
+        
+        topicsDiv.innerHTML = topicsHTML;
+    } else {
+        topicsDiv.innerHTML = '<p>No topics scheduled for this date</p>';
+    }
 }
 
 async function exportToCalendar() {
@@ -1764,7 +1683,14 @@ async function exportToCalendar() {
         const exportButton = document.querySelector('.export-calendar-btn');
         const originalButtonText = exportButton.innerHTML;
         
-        // Update button to show exporting state
+        // Validate if we have calendar data to export
+        if (!calendar || Object.keys(calendar).length === 0) {
+            showError('No calendar data available to export. Please generate a study plan first.');
+            return;
+        }
+        
+        console.log('Attempting to export calendar data:', calendar);
+        
         exportButton.disabled = true;
         exportButton.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
@@ -1774,21 +1700,21 @@ async function exportToCalendar() {
             <span class="deleting-text">Exporting</span>
         `;
 
-        // First check if user is authenticated
+        // Check authentication status
+        console.log('Checking Google Calendar authentication...');
         const authResponse = await fetch('/calendar/check-auth');
         const authData = await authResponse.json();
+        console.log('Authentication response:', authData);
 
         if (!authData.authenticated) {
-            // Get authorization URL
+            console.log('Not authenticated, redirecting to auth...');
             const urlResponse = await fetch('/calendar/get-calendar-url');
             const urlData = await urlResponse.json();
-            
-            // Redirect to Google OAuth
             window.location.href = urlData.url;
             return;
         }
 
-        // Export events to Google Calendar
+        console.log('Sending calendar data to server...');
         const response = await fetch('/calendar/add-to-calendar', {
             method: 'POST',
             headers: {
@@ -1797,20 +1723,28 @@ async function exportToCalendar() {
             body: JSON.stringify({ calendar: calendar })
         });
 
+        // Log the raw response for debugging
+        console.log('Server response status:', response.status);
+        
+        // Parse the response data
+        const responseData = await response.json();
+        console.log('Server response data:', responseData);
+        
         if (!response.ok) {
-            throw new Error('Failed to export to calendar');
+            throw new Error(responseData.error || 'Failed to export to calendar');
         }
 
+        // Show success details
         showSuccess('Successfully exported to Google Calendar!');
+        console.log('Events added:', responseData.results.length);
         
-        // Refresh the calendar iframe
+        // Only refresh the calendar after successful export
         await initializeGoogleCalendar();
 
     } catch (error) {
         showError('Failed to export to calendar. Please try again.');
         console.error('Error exporting to calendar:', error);
     } finally {
-        // Reset button state
         const exportButton = document.querySelector('.export-calendar-btn');
         exportButton.disabled = false;
         exportButton.innerHTML = `
@@ -1900,7 +1834,19 @@ function showSuccess(message) {
 function showTypingIndicator() {
     const indicator = document.createElement('div');
     indicator.className = 'typing-indicator';
-    indicator.innerHTML = '<span></span><span></span><span></span>';
+    
+    // Create pulse animation container
+    const pulseContainer = document.createElement('div');
+    pulseContainer.className = 'pulse-container';
+    
+    // Create 3 pulse dots
+    for (let i = 0; i < 3; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'pulse-dot';
+        pulseContainer.appendChild(dot);
+    }
+    
+    indicator.appendChild(pulseContainer);
     document.querySelector('.messages').appendChild(indicator);
 }
 
@@ -2027,6 +1973,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize flashcard listeners
     initializeFlashcardListeners();
+
+    // Clear calendar button
+    const clearButton = document.getElementById('clearCalendarBtn');
+    if (clearButton) {
+        clearButton.addEventListener('click', async () => {
+            await clearCalendar();
+        });
+    }
 });
 
 // Function to show the selected file name
@@ -2205,100 +2159,93 @@ function initializeStudyPlanner() {
     console.log('=== Initializing Study Planner ===');
     
     // Initialize file upload functionality
-    console.log('Setting up file upload system...');
     initializeFileUpload();
     
-    // Reset form and display on first load
-    const fileInput = document.getElementById('syllabus-upload');
-    const generateButton = document.getElementById('generate-plan-btn');
-    const exportButton = document.querySelector('.export-calendar-btn');
-    const clearButton = document.getElementById('clearCalendarBtn');
-    const planDisplay = document.querySelector('.study-plan-display');
-    
-    console.log('Study Planner DOM Elements:', {
-        fileInput: fileInput ? 'Found' : 'Not found',
-        generateButton: generateButton ? 'Found' : 'Not found',
-        exportButton: exportButton ? 'Found' : 'Not found',
-        clearButton: clearButton ? 'Found' : 'Not found',
-        planDisplay: planDisplay ? 'Found' : 'Not found'
-    });
-    
-    if (fileInput) {
-        console.log('Resetting file input');
-        fileInput.value = '';
-        showSelectedFile(fileInput);
-    }
-    
     // Initialize calendar
-    console.log('Initializing Google Calendar...');
     initializeGoogleCalendar();
     
-    // Set up the generate button
+    // Get button references
+    const plannerForm = document.getElementById('planner-form');
+    const generateButton = document.getElementById('generate-plan-btn');
+    const exportButton = document.querySelector('.export-calendar-btn');
+    
+    // Initially disable generate and export buttons
     if (generateButton) {
-        console.log('Setting up generate button');
-        generateButton.disabled = true; // Initially disabled
-        generateButton.addEventListener('click', (e) => {
-            console.log('Generate button clicked');
-            generateStudyPlan(e);
-        });
+        generateButton.disabled = true;
+    }
+    if (exportButton) {
+        exportButton.disabled = true;
     }
     
-    // Set up export calendar button
-    if (exportButton) {
-        console.log('Setting up export button');
-        exportButton.disabled = true; // Initially disabled
-        exportButton.addEventListener('click', (e) => {
-            console.log('Export button clicked');
-            exportToCalendar(e);
-        });
-    }
-
-    // Set up clear calendar button
-    if (clearButton) {
-        console.log('Setting up clear calendar button');
-        clearButton.addEventListener('click', (e) => {
-            console.log('Clear calendar button clicked');
-            const modal = document.getElementById('dateRangeModal');
-            modal.classList.add('show');
-            
-            // Set default date range (current month)
-            const now = new Date();
-            const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            
-            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
-            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
-        });
-        
-        // Handle cancel button
-        document.getElementById('cancelClear').addEventListener('click', () => {
-            document.getElementById('dateRangeModal').classList.remove('show');
-        });
-        
-        // Handle confirm button
-        document.getElementById('confirmClear').addEventListener('click', () => {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            
-            if (startDate && endDate) {
-                if (confirm('Are you sure you want to clear all events between these dates? This cannot be undone.')) {
-                    clearCalendar(startDate, endDate);
-                    document.getElementById('dateRangeModal').classList.remove('show');
-                }
+    // Handle file upload success
+    const fileUpload = document.getElementById('syllabus-upload');
+    if (fileUpload) {
+        fileUpload.addEventListener('change', () => {
+            if (fileUpload.files && fileUpload.files[0]) {
+                generateButton.disabled = false;
             } else {
-                showError('Please select both start and end dates');
+                generateButton.disabled = true;
+                exportButton.disabled = true;
             }
         });
     }
     
-    // Clear any previous study plan
-    if (planDisplay) {
-        console.log('Clearing previous study plan display');
-        planDisplay.style.display = 'none';
-        planDisplay.innerHTML = '';
+    if (plannerForm) {
+        console.log('Found planner form, setting up submit handler');
+        // Remove any existing event listeners
+        plannerForm.removeEventListener('submit', generateStudyPlan);
+        // Add the event listener
+        plannerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            generateStudyPlan(e);
+        });
+    } else {
+        console.error('Planner form not found');
     }
     
-    console.log('=== Study Planner Initialization Complete ===');
+    if (generateButton) {
+        console.log('Found generate button, setting up click handler');
+        // Remove any existing event listeners
+        generateButton.removeEventListener('click', generateStudyPlan);
+        // Add the click event listener as a backup
+        generateButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            generateStudyPlan(e);
+        });
+    } else {
+        console.error('Generate plan button not found');
+    }
+    
+    if (exportButton) {
+        console.log('Found export button, setting up click handler');
+        // Remove any existing event listeners
+        exportButton.removeEventListener('click', exportToCalendar);
+        // Add the click event listener
+        exportButton.addEventListener('click', exportToCalendar);
+    } else {
+        console.error('Export calendar button not found');
+    }
+    
+    const clearButton = document.getElementById('clearCalendarBtn');
+    if (clearButton) {
+        clearButton.addEventListener('click', clearCalendar);
+    }
+}
+
+// Remove the planner form event listener from DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (keep existing code) ...
+    
+    // Remove this line as we're handling it in initializeStudyPlanner
+    // document.getElementById('planner-form')?.addEventListener('submit', generateStudyPlan);
+    
+    // ... (keep rest of the code) ...
+});
+
+// Remove any existing calendar refresh intervals
+if (window.calendarRefreshInterval) {
+    clearInterval(window.calendarRefreshInterval);
+    window.calendarRefreshInterval = null;
 }
 
 async function initializeGoogleCalendar() {
@@ -2313,39 +2260,55 @@ async function initializeGoogleCalendar() {
         
         // Create an iframe for the Google Calendar embed
         const calendarContainer = document.getElementById('google-calendar');
+        if (!calendarContainer) {
+            console.error('Calendar container not found');
+            return;
+        }
+
+        // Clear existing content
+        calendarContainer.innerHTML = '';
+        
+        // Create and configure iframe with sandbox attributes
         const iframe = document.createElement('iframe');
-        iframe.src = data.embed_url;
+        
+        // Add timestamp to URL to prevent caching
+        const timestamp = new Date().getTime();
+        const embedUrl = data.embed_url + (data.embed_url.includes('?') ? '&' : '?') + 'ts=' + timestamp;
+        
+        iframe.src = embedUrl;
         iframe.style.border = '0';
         iframe.width = '100%';
         iframe.height = '100%';
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox');
+        iframe.setAttribute('loading', 'lazy');
         
-        // Clear existing content and add the new iframe
-        calendarContainer.innerHTML = '';
+        // Log the iframe URL for debugging
+        console.log('Loading Google Calendar iframe with URL:', embedUrl);
+        
+        // Add iframe to container
         calendarContainer.appendChild(iframe);
-
-        // Set up periodic refresh every 5 minutes
-        if (!window.calendarRefreshInterval) {
-            window.calendarRefreshInterval = setInterval(async () => {
-                await updateGoogleCalendar();
-            }, 5 * 60 * 1000); // 5 minutes
-        }
         
     } catch (error) {
         console.error('Error initializing calendar:', error);
+        showError('Failed to initialize calendar view');
     }
 }
 
-async function updateGoogleCalendar() {
-    try {
-        // Re-initialize the calendar to show new events
-        await initializeGoogleCalendar();
-    } catch (error) {
-        console.error('Error updating calendar:', error);
+// Update calendar only when changes are made
+async function updateGoogleCalendar(events) {
+    // Only update if there are new events
+    if (events && Object.keys(events).length > 0) {
+        try {
+            await initializeGoogleCalendar();
+        } catch (error) {
+            console.error('Error updating calendar:', error);
+        }
     }
 }
 
-// Call initializeGoogleCalendar when the page loads
-document.addEventListener('DOMContentLoaded', initializeGoogleCalendar);
+// Remove automatic refresh on visibility/focus changes
+document.removeEventListener('visibilitychange', updateGoogleCalendar);
+window.removeEventListener('focus', updateGoogleCalendar);
 
 function handleURLParameters() {
     // Check if there's a file parameter in the URL
@@ -2364,71 +2327,91 @@ function handleURLParameters() {
     }
 }
 
-async function clearCalendar(fromDate, toDate) {
+async function clearCalendar() {
     try {
         const clearButton = document.getElementById('clearCalendarBtn');
+        if (!clearButton) return;
+        
+        const originalButtonText = clearButton.innerHTML;
         
         // Update button to show deleting state
         clearButton.disabled = true;
         clearButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18"></path>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6v6l4 2"></path>
             </svg>
-            <span class="deleting-text">Deleting</span>
+            <span class="deleting-text">Clearing events...</span>
         `;
 
-        // First check if user is authenticated
+        // Check authentication
         const authResponse = await fetch('/calendar/check-auth');
         const authData = await authResponse.json();
 
         if (!authData.authenticated) {
-            // Get authorization URL
             const urlResponse = await fetch('/calendar/get-calendar-url');
             const urlData = await urlResponse.json();
-            
-            // Redirect to Google OAuth
-            window.location.href = urlData.url;
-            return;
+            if (urlData.url) {
+                window.location.href = urlData.url;
+                return;
+            }
+            throw new Error('Failed to get authentication URL');
         }
 
-        // Clear events from Google Calendar
+        // Calculate date range (4 months before to 1 month after)
+        const fromDate = new Date();
+        fromDate.setMonth(fromDate.getMonth() - 4); // 4 months ago
+        const toDate = new Date();
+        toDate.setMonth(toDate.getMonth() + 1); // 1 month from now
+
+        // Clear events within the date range
         const response = await fetch('/calendar/clear-calendar', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
-            body: JSON.stringify({ fromDate, toDate })
+            body: JSON.stringify({
+                fromDate: fromDate.toISOString().split('T')[0],
+                toDate: toDate.toISOString().split('T')[0],
+                calendarId: 'primary'
+            })
         });
 
         if (!response.ok) {
-            throw new Error('Failed to clear calendar');
+            const errorData = await response.text();
+            throw new Error(`Failed to clear calendar: ${errorData}`);
         }
 
         const data = await response.json();
+        
+        // Show success message
         showSuccess(data.message || 'Successfully cleared calendar events');
 
-        // Refresh the calendar iframe
-        await initializeGoogleCalendar();
+        // Wait a moment before refreshing the calendar view
+        setTimeout(async () => {
+            await initializeGoogleCalendar();
+        }, 1000);
 
     } catch (error) {
-        showError('Failed to clear calendar. Please try again.');
         console.error('Error clearing calendar:', error);
+        showError(error.message || 'Failed to clear calendar. Please try again.');
     } finally {
         // Reset button state
         const clearButton = document.getElementById('clearCalendarBtn');
-        clearButton.disabled = false;
-        clearButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 6h18"></path>
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-            Clear Calendar
-        `;
+        if (clearButton) {
+            clearButton.disabled = false;
+            clearButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+                Clear Calendar
+            `;
+        }
     }
 }
 
@@ -2443,3 +2426,53 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', () => {
     updateGoogleCalendar();
 });
+
+function initializeScrollFunctionality() {
+    const messagesContainer = document.querySelector('.messages');
+    const scrollButton = document.getElementById('scroll-to-bottom');
+    let isAutoScrollEnabled = true;
+    
+    if (!messagesContainer || !scrollButton) return;
+    
+    // Show/hide scroll button based on scroll position
+    messagesContainer.addEventListener('scroll', () => {
+        const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 100;
+        
+        if (isNearBottom) {
+            scrollButton.classList.remove('visible');
+            isAutoScrollEnabled = true;
+        } else {
+            scrollButton.classList.add('visible');
+            isAutoScrollEnabled = false;
+        }
+    });
+    
+    // Scroll to bottom when button is clicked
+    scrollButton.addEventListener('click', () => {
+        scrollToBottom();
+        isAutoScrollEnabled = true;
+    });
+    
+    // Create a MutationObserver to watch for changes in the messages container
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (isAutoScrollEnabled) {
+                scrollToBottom();
+            }
+        });
+    });
+    
+    // Start observing the messages container for changes
+    observer.observe(messagesContainer, {
+        childList: true,
+        subtree: true,
+        characterData: true
+    });
+}
+
+function scrollToBottom() {
+    const messagesContainer = document.querySelector('.messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}

@@ -159,7 +159,7 @@ def chat():
                 if context:
                     messages.append({
                         "role": "system",
-                        "content": f"""You are a medical AI assistant powered by advanced language models. You provide accurate, helpful medical information while being clear about your limitations. Use the following context to help answer questions, but don't mention that you're using this context: {context}
+                        "content": f"""You are a Med-Bot AI assistant powered by advanced language models. You provide accurate, helpful medical information while being clear about your limitations. Use the following context to help answer questions, but don't mention that you're using this context: {context}
 
 Important guidelines:
 - Always be professional and empathetic
@@ -196,7 +196,7 @@ Important guidelines:
                 
                 # Get streaming response from OpenAI
                 response = client.chat.completions.create(
-                    model="gpt-4-turbo-preview",  # Using GPT-4 for better medical knowledge
+                    model="gpt-4o-mini",  # Using GPT-4 for better medical knowledge
                     messages=messages,
                     stream=True,
                     temperature=0.7,

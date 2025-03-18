@@ -485,16 +485,63 @@ def add_to_calendar():
         }), 401
     
     try:
-        study_plan = session.get('study_plan')
-        if not study_plan:
-            return jsonify({"error": "No study plan found. Please generate a plan first."}), 400
-
-        results = insert_events_to_calendar(service, study_plan)
+        # Get data from the request body instead of the session
+        data = request.get_json()
+        if not data or 'calendar' not in data:
+            return jsonify({"error": "No calendar data found in request"}), 400
+            
+        calendar_data = data['calendar']
+        
+        # Convert the calendar object format to a list of events for insert_events_to_calendar
+        events = []
+        for date, topics in calendar_data.items():
+            if isinstance(topics, list):
+                for topic in topics:
+                    if isinstance(topic, dict) and 'task' in topic and 'category' in topic:
+                        # New format: object with task and category
+                        events.append({
+                            "date": date,
+                            "task": topic['task'],
+                            "category": topic['category']
+                        })
+                    elif isinstance(topic, str):
+                        # Old format: just a string
+                        events.append({
+                            "date": date,
+                            "task": topic,
+                            "category": "Study"
+                        })
+                    else:
+                        # Unknown format, try to handle gracefully
+                        events.append({
+                            "date": date,
+                            "task": str(topic),
+                            "category": "Study"
+                        })
+            else:
+                # If topics is not a list, add it as a single event
+                events.append({
+                    "date": date,
+                    "task": str(topics),
+                    "category": "Study"
+                })
+        
+        # If no events were created, check if we should fall back to the session
+        if not events:
+            events = session.get('study_plan', [])
+            if not events:
+                return jsonify({"error": "No valid calendar data found"}), 400
+                
+        # Log what we're about to insert
+        logger.info(f"Inserting {len(events)} events to calendar")
+        
+        results = insert_events_to_calendar(service, events)
         return jsonify({
             "success": True,
             "results": results
         })
     except Exception as e:
+        logger.error(f"Error adding to calendar: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

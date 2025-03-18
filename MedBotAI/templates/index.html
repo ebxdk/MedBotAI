@@ -142,7 +142,12 @@
                             </div>
                         </div>
       </div>
-    </div>
+                </div>
+                <button id="scroll-to-bottom" class="scroll-to-bottom" style="display: none;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M5 12l7 7 7-7"/>
+                    </svg>
+                </button>
                 <form class="chat-form">
                     <div class="input-group">
                         <textarea id="message-input" class="chat-input" placeholder="Ask me anything about medicine..." rows="1" maxlength="4000"></textarea>
@@ -359,7 +364,7 @@
 
         <!-- Settings Panel -->
         <div class="settings-panel">
-            <form id="planner-form" class="planner-form" action="javascript:void(0);" onsubmit="return false;">
+            <form id="planner-form" class="planner-form">
                 <div class="file-upload-container">
                     <div style="display: flex; flex-direction: column; width: 100%;">
                         <label for="syllabus-upload" class="file-upload-label">
@@ -391,7 +396,7 @@
                         </svg>
                         Upload Syllabus
                     </button>
-                    <button type="button" id="generate-plan-btn" class="primary-button" disabled>
+                    <button type="submit" id="generate-plan-btn" class="primary-button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 5v14M5 12h14"></path>
                         </svg>
@@ -443,9 +448,7 @@
             </form>
             
             <!-- Add study plan display container -->
-            <div class="study-plan-display" style="margin-top: 2rem; display: none; padding: 1.5rem; background: rgba(255, 255, 255, 0.07); border-radius: 12px; text-align: left; overflow-y: auto; max-height: 65vh; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); font-size: 1rem; line-height: 1.5;">
-                <!-- Generated study plan will be displayed here -->
-            </div>
+            <div class="study-plan-display" style="display: none;"></div>
         </div>
     </div>
 </section>

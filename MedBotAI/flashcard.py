@@ -140,13 +140,13 @@ def generate_flashcards_with_context(context, num_cards=10, difficulty='intermed
     """Generates AI-powered flashcards using retrieved course content."""
     try:
         prompt = f"""
-        You are an expert educational content creator specializing in creating high-quality flashcards for students.
+        You are an expert flashcard creator to help undergraduate medical students study for their courses and ace their grades.
         
         Below is some course material extracted from a textbook:
         
         {context}
         
-        Based ONLY on the above reference material, generate {num_cards} high-quality {difficulty}-level flashcards in JSON format.
+        Based off of the academic material and content from {context}, generate {num_cards} high-quality {difficulty}-level flashcards in JSON format.
         Each flashcard should:
         
         1. Focus on a key concept, definition, or relationship from the material
@@ -187,15 +187,38 @@ def initialize_course_materials():
     """Initialize course materials and FAISS index."""
     global course_chunks, faiss_index
     try:
-        # Get the coursematerial directory and PDF path
-        pdf_path = os.path.join(os.path.dirname(__file__), "coursematerial", "3P32proj1.pdf")
-        logger.info(f"Loading PDF from: {pdf_path}")
+        # Get the coursematerial directory
+        coursematerial_dir = os.path.join(os.path.dirname(__file__), "coursematerial")
+        logger.info(f"Scanning directory: {coursematerial_dir}")
         
-        # Process the PDF
-        course_chunks = process_pdf_for_rag(pdf_path, "Computer Science", "Data Structures")
-        logger.info(f"Successfully processed PDF into {len(course_chunks)} chunks")
+        # Initialize empty list for all chunks
+        course_chunks = []
         
-        # Generate embeddings for chunks
+        # Get all PDF files from the directory
+        pdf_files = [f for f in os.listdir(coursematerial_dir) if f.lower().endswith('.pdf')]
+        
+        if not pdf_files:
+            logger.warning("No PDF files found in coursematerial directory")
+            return
+            
+        logger.info(f"Found {len(pdf_files)} PDF files to process")
+        
+        # Process each PDF file
+        for pdf_file in pdf_files:
+            pdf_path = os.path.join(coursematerial_dir, pdf_file)
+            logger.info(f"Processing PDF: {pdf_file}")
+            
+            # Extract course info from filename (you might want to adjust this logic)
+            course_name = os.path.splitext(pdf_file)[0]
+            
+            # Process the PDF and add chunks to our collection
+            file_chunks = process_pdf_for_rag(pdf_path, "Computer Science", course_name)
+            course_chunks.extend(file_chunks)
+            logger.info(f"Added {len(file_chunks)} chunks from {pdf_file}")
+        
+        logger.info(f"Total chunks processed: {len(course_chunks)}")
+        
+        # Generate embeddings for all chunks
         logger.info("Generating embeddings for chunks...")
         for chunk in course_chunks:
             chunk["embedding"] = generate_embedding(chunk["text"])
@@ -204,6 +227,7 @@ def initialize_course_materials():
         logger.info("Storing embeddings in FAISS index...")
         faiss_index = store_embeddings_faiss(course_chunks)
         logger.info("Course materials initialized successfully")
+        
     except Exception as e:
         logger.error(f"Error initializing course materials: {str(e)}")
         raise
